@@ -5903,6 +5903,7 @@ var $author$project$Home$update = F2(
 											{
 											crop: _Utils_Tuple2(50, 50),
 											id: model.textureCount,
+											prints: _List_Nil,
 											size: {h: 50, w: 50},
 											texture: tex
 										}

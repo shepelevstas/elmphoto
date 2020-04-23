@@ -504,7 +504,7 @@ dropbox model =
          , hijackOn "dragleave" (D.succeed DragLeave)
 
          --  , hijackOn "drop" dropDecoder2
-         , hijackOn "drop" (dropToValues GotValues2)
+         , hijackOn "drop" (dropDecoder GotValues2)
          , onClick Pick
          ]
             ++ hoverStyle model.hover
@@ -523,8 +523,8 @@ dropbox model =
 --     D.at [ "dataTransfer", "files" ] (D.oneOrMore GotValues D.value)
 
 
-dropToValues : (List Value -> value) -> D.Decoder value
-dropToValues msg =
+dropDecoder : (List Value -> value) -> D.Decoder value
+dropDecoder msg =
     D.at [ "dataTransfer", "files" ] (D.list D.value) |> D.map msg
 
 
