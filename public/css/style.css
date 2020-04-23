@@ -1,0 +1,49 @@
+body {
+  padding: 0;
+  font: 14px "Lucida Grande", Helvetica, Arial, sans-serif;
+}
+
+a {
+  color: #00B7FF;
+}
+
+.dropbox-wrap {
+  max-width: 400px;
+  max-height: 200px;
+  margin: 10px auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+.dropbox-cont {
+  border-radius: 8px;
+  border-width: 4px;
+  border-style: dashed;
+  transition: border-color .25s, background-color .25s;
+  background-color: #eee;
+  border-color: #ccc;
+  padding: 20px;
+}
+
+.dropbox {
+  border-radius: 8px;
+  max-width: 400px;
+  max-height: 200px;
+  margin: 10px auto;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  border-width: 4px;
+  border-style: dashed;
+  transition: border-color .25s, background-color .25s;
+  background-color: #eee;
+  border-color: #ccc;
+}
+
+.photo canvas {
+  box-shadow: 0 0 8px gray;
+}

@@ -1,0 +1,137 @@
+extends layout
+block content
+  h1(style='display:inline;')= title
+  p(style='display:inline;color:darkgray;') Welcome to #{title}
+
+  #ELM
+  script(src="/static/js/downscale-canvas.js")
+  script(src='/static/js/elm-canvas.js')
+  script(src="/static/js/elm.js")
+  script.
+    const app = Elm.Home.init({
+      node: document.getElementById('ELM')
+    })
+
+    app.ports.sendFiles.subscribe(files => {
+      console.log(files)
+      const startIndex = files[0]
+      files[1].map((file,i)=>[startIndex+i,file]).forEach(pair=>{
+        const index = pair[0]
+        const dataUrl = pair[1]
+        urlToSmallImage(dataUrl).then(img=>{
+          if (img.width>img.height)
+            img.style.width = '50px'
+          else
+            img.style.height = '50px'
+          TEST.appendChild(img)
+        }).catch(err=>console.log('index',index,'err',err))
+      })
+    })
+
+    app.ports.sendValues.subscribe(files=>{
+      files.forEach(file=>{
+        fileToSmallImage(file).then(img=>{
+          app.ports.recvImage.send(img)
+        }).catch(err=>console.log('err',err,'file',file))
+      })
+    })
+
+    // url -> Promise Image
+    function loadImage(src){
+      return new Promise((done,fail)=>{
+        const image = new Image()
+        image.crossOrigin = 'Anonymous'
+        image.onload = () => done(image)
+        image.onerror = err => fail(err)
+        image.src = src
+      })
+    }
+
+    // File -> Promise Image
+    function fileToImage(file){
+      return new Promise((done,fail)=>{
+        const reader = new FileReader()
+        reader.onload = () => {
+          loadImage(reader.result)
+            .then(done)
+            .catch(fail)
+        }
+        reader.onerror = err => fail(err)
+        reader.readAsDataURL(file)
+      })
+    }
+
+    // Image -> Canvas
+    function imageToCanvas(image){
+      const canvas = document.createElement('canvas')
+      canvas.width = image.width
+      canvas.height = image.height
+      const context = canvas.getContext("2d")
+      context.drawImage(image, 0, 0)
+      return canvas
+    }
+
+    // Canvas -> Image
+    function canvasToImage(canvas){
+      const image = new Image()
+      image.crossOrigin = 'Anonymous'
+      image.src = canvas.toDataURL()
+      return image
+    }
+
+    // dataUrl -> Promise Image
+    function urlToSmallImage(url){
+      return loadImage(url).then(image=>{
+        const scale = 200/Math.max(image.width,image.height)
+        if (scale>=1||scale<=0) return image
+        return canvasToImage(downScaleCanvas(imageToCanvas(image),scale))
+      })
+    }
+
+    // File -> Promise Image
+    function fileToSmallImage(file){
+      return fileToImage(file).then(image=>{
+        const scale = 256/Math.max(image.width,image.height)
+        if (scale>=1||scale<=0) return image
+        return canvasToImage(downScaleCanvas(imageToCanvas(image),scale))
+      })
+    }
+
+    // [File] -> Promise [Image]
+    function filesToSmallImgs(files){
+      return Promise.all(Array.from(files).map(fileToSmallImage))
+    }
+
+  #TEST
+    input#SELECT(type='file' accept='image/*' multiple style='display:block;')
+  script.
+    SELECT.addEventListener('change',function(e){
+      if (this.files.length==1){
+        fileToSmallImage(this.files[0])
+          .then(img=>TEST.appendChild(img))
+      } else if (this.files.length>0){
+        //- filesToSmallImgs(this.files)
+        //-   .then(imgs=>imgs.forEach(img=>TEST.appendChild(img)))
+        //-   .catch(err=>alert(err))
+        Array.from(this.files).map(file=>{
+          fileToSmallImage(file).then(img=>{
+            if (img.width>img.height)
+              img.style.width = '50px'
+            else
+              img.style.height = '50px'
+            TEST.appendChild(img)
+          }).catch(err=>{
+            const span = document.createElement('span')
+            span.innerText = file.name
+            span.style.lineHeight = '50px'
+            span.style.color = 'red'
+            span.style.fontFamily = 'arial'
+            span.style.fontWeight = 'bold'
+            span.style.border = '1px solid red'
+            TEST.appendChild(span)
+          })
+        })
+      }
+      this.value = ""
+    })
+
