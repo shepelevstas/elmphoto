@@ -12,26 +12,26 @@ block content
       node: document.getElementById('ELM')
     })
 
-    app.ports.sendFiles.subscribe(files => {
-      console.log(files)
-      const startIndex = files[0]
-      files[1].map((file,i)=>[startIndex+i,file]).forEach(pair=>{
-        const index = pair[0]
-        const dataUrl = pair[1]
-        urlToSmallImage(dataUrl).then(img=>{
-          if (img.width>img.height)
-            img.style.width = '50px'
-          else
-            img.style.height = '50px'
-          TEST.appendChild(img)
-        }).catch(err=>console.log('index',index,'err',err))
-      })
-    })
+    //- app.ports.sendFiles.subscribe(files => {
+    //-   console.log(files)
+    //-   const startIndex = files[0]
+    //-   files[1].map((file,i)=>[startIndex+i,file]).forEach(pair=>{
+    //-     const index = pair[0]
+    //-     const dataUrl = pair[1]
+    //-     urlToSmallImage(dataUrl).then(img=>{
+    //-       if (img.width>img.height)
+    //-         img.style.width = '50px'
+    //-       else
+    //-         img.style.height = '50px'
+    //-       TEST.appendChild(img)
+    //-     }).catch(err=>console.log('index',index,'err',err))
+    //-   })
+    //- })
 
     app.ports.sendValues.subscribe(files=>{
       files.forEach(file=>{
         fileToSmallImage(file).then(img=>{
-          app.ports.recvImage.send(img)
+          app.ports.recvImage.send([file,img])
         }).catch(err=>console.log('err',err,'file',file))
       })
     })

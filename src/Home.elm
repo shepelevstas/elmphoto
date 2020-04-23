@@ -43,16 +43,34 @@ port sendFiles : ( Int, List String ) -> Cmd msg
 port sendValues : List Value -> Cmd msg
 
 
-port recvImage : (D.Value -> msg) -> Sub msg
+port recvImage : (( D.Value, D.Value ) -> msg) -> Sub msg
 
 
 subscriptions : Model -> Sub Msg
 subscriptions _ =
-    recvImage RecvImage
+    recvImage recvFileDecoder
 
 
+recvFileDecoder : ( D.Value, D.Value ) -> Msg
+recvFileDecoder ( fileValue, imgValue ) =
+    let
+        fileRes =
+            D.decodeValue File.decoder fileValue
 
--- MODEL
+        imgMaybe =
+            Canvas.Texture.fromDomImage imgValue
+    in
+    case fileRes of
+        Ok file ->
+            case imgMaybe of
+                Just img ->
+                    RecvImage ( file, img )
+
+                _ ->
+                    NoOp
+
+        _ ->
+            NoOp
 
 
 type alias Model =
@@ -82,6 +100,7 @@ type alias PhotoData =
         , h : Float
         }
     , prints : List Print
+    , file : File
     }
 
 
@@ -111,6 +130,14 @@ type alias Point =
     ( Float, Float )
 
 
+type alias Rect =
+    { x : Float
+    , y : Float
+    , w : Float
+    , h : Float
+    }
+
+
 type Drag
     = DragNone
     | DragMove Point
@@ -121,9 +148,37 @@ type alias PrintSize =
     ( Int, Int )
 
 
+
+-- ( width in mm, height in mm )
+
+
+printSizes =
+    [ ( 102, 152, "10x15" )
+    , ( 152, 203, "15x20" )
+    , ( 152, 210, "15x21" )
+    , ( 152, 230, "15x23" )
+    , ( 203, 305, "20x30" )
+    , ( 210, 305, "21x30" )
+    ]
+
+
+type CropMode
+    = Fill -- cut off what does not fit
+    | Fit -- fit in the whole picture, add white padding
+
+
+type Turn
+    = N -- Original, no turn
+    | E -- 90 deg clockwise turn
+    | W -- 90 deg counter clockwise turn
+    | S -- upside down turn, 180 deg
+
+
 type alias Print =
     { q : Int
     , size : PrintSize
+    , crop : Rect
+    , mode : CropMode
     }
 
 
@@ -153,27 +208,20 @@ type Msg
     | GotFilesUrls ( List File, List String )
       -- | GotValues Value (List Value)
     | GotValues2 (List Value)
-    | RecvImage D.Value
+    | RecvImage ( File, Texture )
       -- | Log Mouse.Event
     | MouseDown PhotoData Point
     | MouseMove PhotoData Point
     | MouseUp
+    | NoOp
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        -- Log event ->
-        --     let
-        --         pos =
-        --             log "pos" event.offsetPos
-        --         cur =
-        --             if inBox 50 100 50 100 pos then
-        --                 Move
-        --             else
-        --                 Null
-        --     in
-        --     ( { model | cursor = cur }, Cmd.none )
+        NoOp ->
+            ( model, Cmd.none )
+
         MouseDown photo p ->
             let
                 size_p =
@@ -199,13 +247,13 @@ update msg model =
                 DragNone ->
                     let
                         size_p =
-                            addPoint photo.crop ( photo.size.w - 4, photo.size.h - 4 )
+                            addPoint crop ( photo.size.w - 4, photo.size.h - 4 )
 
                         cur =
                             if inBox size_p ( 8, 8 ) p then
                                 Cross
 
-                            else if inBox photo.crop ( photo.size.w, photo.size.h ) p then
+                            else if inBox crop ( photo.size.w, photo.size.h ) p then
                                 Move
 
                             else
@@ -214,12 +262,16 @@ update msg model =
                     ( { model | cursor = cur }, Cmd.none )
 
                 DragMove dp ->
+                    let
+                        dim =
+                            Canvas.Texture.dimensions photo.texture
+                    in
                     ( { model
                         | textures =
                             map
                                 (\({ id } as ph) ->
                                     if id == photo.id then
-                                        { photo | crop = deltaPoint dp p }
+                                        { photo | crop = deltaPoint dp p |> clampPoint { x = 0, y = 0, w = dim.width - photo.size.w, h = dim.height - photo.size.h } }
 
                                     else
                                         ph
@@ -231,18 +283,25 @@ update msg model =
 
                 DragSize ( dx, dy ) ->
                     let
-                        w =
-                            x - crop_x - dx + 4
+                        -- w =
+                        --     x - crop_x - dx + 4
+                        -- h =
+                        --     y - crop_y - dy + 4
+                        s =
+                            ( photo.size.w, photo.size.h )
 
-                        h =
-                            y - crop_y - dy + 4
+                        ( new_w, new_h ) =
+                            mul (dot s ( x - crop_x - dx + 4, y - crop_y - dy + 4 ) / dot s s) s
+
+                        _ =
+                            log "aspect" (Debug.toString <| new_w / new_h)
                     in
                     ( { model
                         | textures =
                             map
                                 (\({ id } as ph) ->
                                     if id == photo.id then
-                                        { photo | size = { w = w, h = h } }
+                                        { photo | size = { w = new_w, h = new_h } }
 
                                     else
                                         ph
@@ -352,31 +411,100 @@ update msg model =
             , Cmd.none
             )
 
-        RecvImage img ->
+        RecvImage ( file, img ) ->
             let
-                texture =
-                    Canvas.Texture.fromDomImage img
-            in
-            case texture of
-                Nothing ->
-                    -- later: info about an error
-                    ( model, Cmd.none )
+                { width, height } =
+                    Canvas.Texture.dimensions img
 
-                Just tex ->
-                    ( { model
-                        | textures =
-                            model.textures
-                                ++ [ { id = model.textureCount
-                                     , texture = tex
-                                     , crop = ( 50, 50 )
-                                     , size = { w = 50, h = 50 }
-                                     , prints = []
-                                     }
-                                   ]
-                        , textureCount = model.textureCount + 1
-                      }
-                    , Cmd.none
-                    )
+                _ =
+                    log "dims" (Debug.toString ( width, height ))
+
+                print =
+                    if width > height then
+                        if width / height > 152 / 102 then
+                            let
+                                w =
+                                    152 * height / 102
+
+                                x =
+                                    (width - w) / (2 * width)
+                            in
+                            Print 1
+                                ( 152, 102 )
+                                { x = x
+                                , y = 0
+                                , w = w / width
+                                , h = 1
+                                }
+                                Fill
+
+                        else
+                            let
+                                h =
+                                    102 * width / 152
+
+                                y =
+                                    (height - h) / (2 * height)
+                            in
+                            Print 1
+                                ( 152, 102 )
+                                { x = 0
+                                , y = y
+                                , w = 1
+                                , h = h / height
+                                }
+                                Fill
+
+                    else if height / width > 152 / 102 then
+                        let
+                            h =
+                                152 * width / 102
+
+                            y =
+                                (height - h) / (2 * height)
+                        in
+                        Print 1
+                            ( 102, 152 )
+                            { x = 0
+                            , y = y
+                            , w = 1
+                            , h = h / height
+                            }
+                            Fill
+
+                    else
+                        let
+                            w =
+                                102 * height / 152
+
+                            x =
+                                (width - w) / (2 * width)
+                        in
+                        Print 1 ( 102, 152 ) { x = x, y = 0, w = w / width, h = 1 } Fill
+
+                -- x = if width/height > 152/102 then
+            in
+            ( { model
+                | textureCount = model.textureCount + 1
+                , textures =
+                    model.textures
+                        ++ [ { id = model.textureCount
+                             , texture = img
+                             , crop =
+                                ( print.crop.x * width
+                                , print.crop.y * height
+                                )
+                             , size =
+                                { w = print.crop.w * width
+                                , h = print.crop.h * height
+                                }
+                             , prints = [ print ]
+                             , file = file
+                             }
+                           ]
+              }
+            , Cmd.none
+            )
 
 
 maxOr : comparable -> List comparable -> comparable
@@ -415,7 +543,7 @@ view model =
 
                     -- , hijackOn "change" changeDecoder
                     -- , on "change" (D.at [ "target", "files" ] (D.list D.value) |> D.map GotValues2)
-                    , on "change" (filesToValues GotValues2)
+                    , on "change" (fileInputDecoder GotValues2)
                     , value ""
                     ]
                     []
@@ -442,8 +570,8 @@ view model =
 -- filesToValues : (a -> Msg) -> D.Decoder Msg
 
 
-filesToValues : (List D.Value -> value) -> D.Decoder value
-filesToValues msg =
+fileInputDecoder : (List D.Value -> value) -> D.Decoder value
+fileInputDecoder msg =
     D.at [ "target", "files" ] (D.list D.value) |> D.map msg
 
 
@@ -456,6 +584,9 @@ photoEditor cur ({ texture, crop, size } as photo) =
     let
         dim =
             Canvas.Texture.dimensions texture
+
+        ( crop_x, crop_y ) =
+            crop
     in
     Canvas.toHtml ( round dim.width, round dim.height )
         [ Mouse.onMove (.offsetPos >> MouseMove photo)
@@ -466,8 +597,11 @@ photoEditor cur ({ texture, crop, size } as photo) =
         , style "cursor" (curToStyle cur)
         ]
         [ Canvas.texture [] ( 0, 0 ) texture
-        , Canvas.shapes [ Canvas.Settings.fill Color.white ]
-            [ Canvas.rect crop size.w size.h
+        , Canvas.shapes [ Canvas.Settings.fill (Color.rgba 1 1 1 0.65) ]
+            [ Canvas.rect ( 0, 0 ) dim.width crop_y
+            , Canvas.rect ( 0, crop_y ) crop_x size.h
+            , Canvas.rect ( crop_x + size.w, crop_y ) dim.width size.h
+            , Canvas.rect ( 0, crop_y + size.h ) dim.width dim.height
             ]
         , Canvas.shapes [ Canvas.Settings.fill (Color.rgb255 33 150 243) ]
             [ Canvas.rect (addPoint crop ( size.w - 4, size.h - 4 )) 8 8
@@ -620,6 +754,28 @@ deltaPoint ( x0, y0 ) ( x1, y1 ) =
 addPoint : Point -> Point -> Point
 addPoint ( x0, y0 ) ( x1, y1 ) =
     ( x0 + x1, y0 + y1 )
+
+
+clampPoint : Rect -> Point -> Point
+clampPoint { x, y, w, h } ( px, py ) =
+    ( lim x (x + w) px
+    , lim y (y + h) py
+    )
+
+
+lim : number -> number -> number -> number
+lim a b v =
+    max a (min v b)
+
+
+dot : Point -> Point -> Float
+dot ( x1, y1 ) ( x2, y2 ) =
+    x1 * x2 + y1 * y2
+
+
+mul : Float -> Point -> Point
+mul m ( x, y ) =
+    ( m * x, m * y )
 
 
 

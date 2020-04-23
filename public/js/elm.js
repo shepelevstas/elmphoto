@@ -5335,60 +5335,16 @@ var $author$project$Home$init = function (_v0) {
 		A9($author$project$Home$Model, false, false, _List_Nil, _List_Nil, _List_Nil, _List_Nil, $author$project$Home$Null, 0, $author$project$Home$DragNone),
 		$elm$core$Platform$Cmd$none);
 };
+var $author$project$Home$NoOp = {$: 'NoOp'};
 var $author$project$Home$RecvImage = function (a) {
 	return {$: 'RecvImage', a: a};
 };
-var $elm$json$Json$Decode$value = _Json_decodeValue;
-var $author$project$Home$recvImage = _Platform_incomingPort('recvImage', $elm$json$Json$Decode$value);
-var $author$project$Home$subscriptions = function (_v0) {
-	return $author$project$Home$recvImage($author$project$Home$RecvImage);
-};
-var $author$project$Home$Cross = {$: 'Cross'};
-var $author$project$Home$DragMove = function (a) {
-	return {$: 'DragMove', a: a};
-};
-var $author$project$Home$DragSize = function (a) {
-	return {$: 'DragSize', a: a};
-};
-var $author$project$Home$GotFiles = F2(
-	function (a, b) {
-		return {$: 'GotFiles', a: a, b: b};
-	});
-var $author$project$Home$GotFilesUrls = function (a) {
-	return {$: 'GotFilesUrls', a: a};
-};
-var $author$project$Home$Move = {$: 'Move'};
-var $author$project$Home$addPoint = F2(
-	function (_v0, _v1) {
-		var x0 = _v0.a;
-		var y0 = _v0.b;
-		var x1 = _v1.a;
-		var y1 = _v1.b;
-		return _Utils_Tuple2(x0 + x1, y0 + y1);
-	});
-var $author$project$Home$deltaPoint = F2(
-	function (_v0, _v1) {
-		var x0 = _v0.a;
-		var y0 = _v0.b;
-		var x1 = _v1.a;
-		var y1 = _v1.b;
-		return _Utils_Tuple2(x1 - x0, y1 - y0);
-	});
+var $elm$json$Json$Decode$decodeValue = _Json_run;
 var $elm$time$Time$Posix = function (a) {
 	return {$: 'Posix', a: a};
 };
 var $elm$time$Time$millisToPosix = $elm$time$Time$Posix;
-var $elm$file$File$Select$files = F2(
-	function (mimes, toMsg) {
-		return A2(
-			$elm$core$Task$perform,
-			function (_v0) {
-				var f = _v0.a;
-				var fs = _v0.b;
-				return A2(toMsg, f, fs);
-			},
-			_File_uploadOneOrMore(mimes));
-	});
+var $elm$file$File$decoder = _File_decoder;
 var $elm$core$Maybe$andThen = F2(
 	function (callback, maybeValue) {
 		if (maybeValue.$ === 'Just') {
@@ -5406,6 +5362,7 @@ var $elm$json$Json$Decode$field = _Json_decodeField;
 var $elm$json$Json$Decode$float = _Json_decodeFloat;
 var $elm$json$Json$Decode$map3 = _Json_map3;
 var $elm$json$Json$Decode$string = _Json_decodeString;
+var $elm$json$Json$Decode$value = _Json_decodeValue;
 var $joakin$elm_canvas$Canvas$Internal$Texture$decodeTextureImage = A2(
 	$elm$json$Json$Decode$andThen,
 	function (image) {
@@ -5422,7 +5379,6 @@ var $joakin$elm_canvas$Canvas$Internal$Texture$decodeTextureImage = A2(
 			A2($elm$json$Json$Decode$field, 'height', $elm$json$Json$Decode$float));
 	},
 	$elm$json$Json$Decode$value);
-var $elm$json$Json$Decode$decodeValue = _Json_run;
 var $elm$core$Result$toMaybe = function (result) {
 	if (result.$ === 'Ok') {
 		var v = result.a;
@@ -5438,6 +5394,129 @@ var $joakin$elm_canvas$Canvas$Texture$fromDomImage = function (value) {
 		$elm$core$Result$toMaybe(
 			A2($elm$json$Json$Decode$decodeValue, $joakin$elm_canvas$Canvas$Internal$Texture$decodeTextureImage, value)));
 };
+var $author$project$Home$recvFileDecoder = function (_v0) {
+	var fileValue = _v0.a;
+	var imgValue = _v0.b;
+	var imgMaybe = $joakin$elm_canvas$Canvas$Texture$fromDomImage(imgValue);
+	var fileRes = A2($elm$json$Json$Decode$decodeValue, $elm$file$File$decoder, fileValue);
+	if (fileRes.$ === 'Ok') {
+		var file = fileRes.a;
+		if (imgMaybe.$ === 'Just') {
+			var img = imgMaybe.a;
+			return $author$project$Home$RecvImage(
+				_Utils_Tuple2(file, img));
+		} else {
+			return $author$project$Home$NoOp;
+		}
+	} else {
+		return $author$project$Home$NoOp;
+	}
+};
+var $elm$json$Json$Decode$index = _Json_decodeIndex;
+var $author$project$Home$recvImage = _Platform_incomingPort(
+	'recvImage',
+	A2(
+		$elm$json$Json$Decode$andThen,
+		function (_v0) {
+			return A2(
+				$elm$json$Json$Decode$andThen,
+				function (_v1) {
+					return $elm$json$Json$Decode$succeed(
+						_Utils_Tuple2(_v0, _v1));
+				},
+				A2($elm$json$Json$Decode$index, 1, $elm$json$Json$Decode$value));
+		},
+		A2($elm$json$Json$Decode$index, 0, $elm$json$Json$Decode$value)));
+var $author$project$Home$subscriptions = function (_v0) {
+	return $author$project$Home$recvImage($author$project$Home$recvFileDecoder);
+};
+var $author$project$Home$Cross = {$: 'Cross'};
+var $author$project$Home$DragMove = function (a) {
+	return {$: 'DragMove', a: a};
+};
+var $author$project$Home$DragSize = function (a) {
+	return {$: 'DragSize', a: a};
+};
+var $author$project$Home$Fill = {$: 'Fill'};
+var $author$project$Home$GotFiles = F2(
+	function (a, b) {
+		return {$: 'GotFiles', a: a, b: b};
+	});
+var $author$project$Home$GotFilesUrls = function (a) {
+	return {$: 'GotFilesUrls', a: a};
+};
+var $author$project$Home$Move = {$: 'Move'};
+var $author$project$Home$Print = F4(
+	function (q, size, crop, mode) {
+		return {crop: crop, mode: mode, q: q, size: size};
+	});
+var $author$project$Home$addPoint = F2(
+	function (_v0, _v1) {
+		var x0 = _v0.a;
+		var y0 = _v0.b;
+		var x1 = _v1.a;
+		var y1 = _v1.b;
+		return _Utils_Tuple2(x0 + x1, y0 + y1);
+	});
+var $elm$core$Basics$min = F2(
+	function (x, y) {
+		return (_Utils_cmp(x, y) < 0) ? x : y;
+	});
+var $author$project$Home$lim = F3(
+	function (a, b, v) {
+		return A2(
+			$elm$core$Basics$max,
+			a,
+			A2($elm$core$Basics$min, v, b));
+	});
+var $author$project$Home$clampPoint = F2(
+	function (_v0, _v1) {
+		var x = _v0.x;
+		var y = _v0.y;
+		var w = _v0.w;
+		var h = _v0.h;
+		var px = _v1.a;
+		var py = _v1.b;
+		return _Utils_Tuple2(
+			A3($author$project$Home$lim, x, x + w, px),
+			A3($author$project$Home$lim, y, y + h, py));
+	});
+var $author$project$Home$deltaPoint = F2(
+	function (_v0, _v1) {
+		var x0 = _v0.a;
+		var y0 = _v0.b;
+		var x1 = _v1.a;
+		var y1 = _v1.b;
+		return _Utils_Tuple2(x1 - x0, y1 - y0);
+	});
+var $joakin$elm_canvas$Canvas$Texture$dimensions = function (texture) {
+	if (texture.$ === 'TImage') {
+		var image = texture.a;
+		return {height: image.height, width: image.width};
+	} else {
+		var data = texture.a;
+		return {height: data.height, width: data.width};
+	}
+};
+var $author$project$Home$dot = F2(
+	function (_v0, _v1) {
+		var x1 = _v0.a;
+		var y1 = _v0.b;
+		var x2 = _v1.a;
+		var y2 = _v1.b;
+		return (x1 * x2) + (y1 * y2);
+	});
+var $elm$file$File$Select$files = F2(
+	function (mimes, toMsg) {
+		return A2(
+			$elm$core$Task$perform,
+			function (_v0) {
+				var f = _v0.a;
+				var fs = _v0.b;
+				return A2(toMsg, f, fs);
+			},
+			_File_uploadOneOrMore(mimes));
+	});
 var $elm$core$Basics$not = _Basics_not;
 var $author$project$Home$inBox = F3(
 	function (_v0, _v1, _v2) {
@@ -5475,6 +5554,12 @@ var $author$project$Home$maxOr = F2(
 			$elm$core$Maybe$withDefault,
 			v,
 			$elm$core$List$maximum(list));
+	});
+var $author$project$Home$mul = F2(
+	function (m, _v0) {
+		var x = _v0.a;
+		var y = _v0.b;
+		return _Utils_Tuple2(m * x, m * y);
 	});
 var $elm$core$Tuple$pair = F2(
 	function (a, b) {
@@ -5688,6 +5773,7 @@ var $author$project$Home$sendFiles = _Platform_outgoingPort(
 var $author$project$Home$sendValues = _Platform_outgoingPort(
 	'sendValues',
 	$elm$json$Json$Encode$list($elm$core$Basics$identity));
+var $elm$core$Debug$toString = _Debug_toString;
 var $elm$file$File$toUrl = _File_toUrl;
 var $author$project$Home$zip = F2(
 	function (a, b) {
@@ -5696,6 +5782,8 @@ var $author$project$Home$zip = F2(
 var $author$project$Home$update = F2(
 	function (msg, model) {
 		switch (msg.$) {
+			case 'NoOp':
+				return _Utils_Tuple2(model, $elm$core$Platform$Cmd$none);
 			case 'MouseDown':
 				var photo = msg.a;
 				var p = msg.b;
@@ -5740,7 +5828,7 @@ var $author$project$Home$update = F2(
 					case 'DragNone':
 						var size_p = A2(
 							$author$project$Home$addPoint,
-							photo.crop,
+							crop,
 							_Utils_Tuple2(photo.size.w - 4, photo.size.h - 4));
 						var cur = A3(
 							$author$project$Home$inBox,
@@ -5748,7 +5836,7 @@ var $author$project$Home$update = F2(
 							_Utils_Tuple2(8, 8),
 							p) ? $author$project$Home$Cross : (A3(
 							$author$project$Home$inBox,
-							photo.crop,
+							crop,
 							_Utils_Tuple2(photo.size.w, photo.size.h),
 							p) ? $author$project$Home$Move : $author$project$Home$Null);
 						return _Utils_Tuple2(
@@ -5758,6 +5846,7 @@ var $author$project$Home$update = F2(
 							$elm$core$Platform$Cmd$none);
 					case 'DragMove':
 						var dp = _v2.a;
+						var dim = $joakin$elm_canvas$Canvas$Texture$dimensions(photo.texture);
 						return _Utils_Tuple2(
 							_Utils_update(
 								model,
@@ -5769,7 +5858,10 @@ var $author$project$Home$update = F2(
 											return _Utils_eq(id, photo.id) ? _Utils_update(
 												photo,
 												{
-													crop: A2($author$project$Home$deltaPoint, dp, p)
+													crop: A2(
+														$author$project$Home$clampPoint,
+														{h: dim.height - photo.size.h, w: dim.width - photo.size.w, x: 0, y: 0},
+														A2($author$project$Home$deltaPoint, dp, p))
 												}) : ph;
 										},
 										model.textures)
@@ -5779,8 +5871,20 @@ var $author$project$Home$update = F2(
 						var _v3 = _v2.a;
 						var dx = _v3.a;
 						var dy = _v3.b;
-						var w = ((x - crop_x) - dx) + 4;
-						var h = ((y - crop_y) - dy) + 4;
+						var s = _Utils_Tuple2(photo.size.w, photo.size.h);
+						var _v4 = A2(
+							$author$project$Home$mul,
+							A2(
+								$author$project$Home$dot,
+								s,
+								_Utils_Tuple2(((x - crop_x) - dx) + 4, ((y - crop_y) - dy) + 4)) / A2($author$project$Home$dot, s, s),
+							s);
+						var new_w = _v4.a;
+						var new_h = _v4.b;
+						var _v5 = A2(
+							$elm$core$Debug$log,
+							'aspect',
+							$elm$core$Debug$toString(new_w / new_h));
 						return _Utils_Tuple2(
 							_Utils_update(
 								model,
@@ -5792,7 +5896,7 @@ var $author$project$Home$update = F2(
 											return _Utils_eq(id, photo.id) ? _Utils_update(
 												photo,
 												{
-													size: {h: h, w: w}
+													size: {h: new_h, w: new_w}
 												}) : ph;
 										},
 										model.textures)
@@ -5836,7 +5940,7 @@ var $author$project$Home$update = F2(
 				var f = msg.a;
 				var fs = msg.b;
 				var files = A2($elm$core$List$cons, f, fs);
-				var _v4 = A2($elm$core$Debug$log, 'GotFiles', files);
+				var _v6 = A2($elm$core$Debug$log, 'GotFiles', files);
 				return _Utils_Tuple2(
 					_Utils_update(
 						model,
@@ -5850,9 +5954,9 @@ var $author$project$Home$update = F2(
 							$elm$core$Task$sequence(
 								A2($elm$core$List$map, $elm$file$File$toUrl, files)))));
 			case 'GotFilesUrls':
-				var _v5 = msg.a;
-				var files = _v5.a;
-				var urls = _v5.b;
+				var _v7 = msg.a;
+				var files = _v7.a;
+				var urls = _v7.b;
 				var maxIndex = A2(
 					$author$project$Home$maxOr,
 					0,
@@ -5885,32 +5989,81 @@ var $author$project$Home$update = F2(
 						}),
 					$elm$core$Platform$Cmd$none);
 			default:
-				var img = msg.a;
-				var texture = $joakin$elm_canvas$Canvas$Texture$fromDomImage(img);
-				if (texture.$ === 'Nothing') {
-					return _Utils_Tuple2(model, $elm$core$Platform$Cmd$none);
-				} else {
-					var tex = texture.a;
-					return _Utils_Tuple2(
-						_Utils_update(
-							model,
-							{
-								textureCount: model.textureCount + 1,
-								textures: _Utils_ap(
-									model.textures,
-									_List_fromArray(
-										[
-											{
-											crop: _Utils_Tuple2(50, 50),
-											id: model.textureCount,
-											prints: _List_Nil,
-											size: {h: 50, w: 50},
-											texture: tex
-										}
-										]))
-							}),
-						$elm$core$Platform$Cmd$none);
-				}
+				var _v8 = msg.a;
+				var file = _v8.a;
+				var img = _v8.b;
+				var _v9 = $joakin$elm_canvas$Canvas$Texture$dimensions(img);
+				var width = _v9.width;
+				var height = _v9.height;
+				var print = function () {
+					if (_Utils_cmp(width, height) > 0) {
+						if (_Utils_cmp(width / height, 152 / 102) > 0) {
+							var w = (152 * height) / 102;
+							var x = (width - w) / (2 * width);
+							return A4(
+								$author$project$Home$Print,
+								1,
+								_Utils_Tuple2(152, 102),
+								{h: 1, w: w / width, x: x, y: 0},
+								$author$project$Home$Fill);
+						} else {
+							var h = (102 * width) / 152;
+							var y = (height - h) / (2 * height);
+							return A4(
+								$author$project$Home$Print,
+								1,
+								_Utils_Tuple2(152, 102),
+								{h: h / height, w: 1, x: 0, y: y},
+								$author$project$Home$Fill);
+						}
+					} else {
+						if (_Utils_cmp(height / width, 152 / 102) > 0) {
+							var h = (152 * width) / 102;
+							var y = (height - h) / (2 * height);
+							return A4(
+								$author$project$Home$Print,
+								1,
+								_Utils_Tuple2(102, 152),
+								{h: h / height, w: 1, x: 0, y: y},
+								$author$project$Home$Fill);
+						} else {
+							var w = (102 * height) / 152;
+							var x = (width - w) / (2 * width);
+							return A4(
+								$author$project$Home$Print,
+								1,
+								_Utils_Tuple2(102, 152),
+								{h: 1, w: w / width, x: x, y: 0},
+								$author$project$Home$Fill);
+						}
+					}
+				}();
+				var _v10 = A2(
+					$elm$core$Debug$log,
+					'dims',
+					$elm$core$Debug$toString(
+						_Utils_Tuple2(width, height)));
+				return _Utils_Tuple2(
+					_Utils_update(
+						model,
+						{
+							textureCount: model.textureCount + 1,
+							textures: _Utils_ap(
+								model.textures,
+								_List_fromArray(
+									[
+										{
+										crop: _Utils_Tuple2(print.crop.x * width, print.crop.y * height),
+										file: file,
+										id: model.textureCount,
+										prints: _List_fromArray(
+											[print]),
+										size: {h: print.crop.h * height, w: print.crop.w * width},
+										texture: img
+									}
+									]))
+						}),
+					$elm$core$Platform$Cmd$none);
 		}
 	});
 var $author$project$Home$GotValues2 = function (a) {
@@ -5939,7 +6092,7 @@ var $elm$json$Json$Decode$at = F2(
 		return A3($elm$core$List$foldr, $elm$json$Json$Decode$field, decoder, fields);
 	});
 var $elm$json$Json$Decode$list = _Json_decodeList;
-var $author$project$Home$dropToValues = function (msg) {
+var $author$project$Home$dropDecoder = function (msg) {
 	return A2(
 		$elm$json$Json$Decode$map,
 		msg,
@@ -6020,7 +6173,7 @@ var $author$project$Home$dropbox = function (model) {
 					A2(
 					$author$project$Home$hijackOn,
 					'drop',
-					$author$project$Home$dropToValues($author$project$Home$GotValues2)),
+					$author$project$Home$dropDecoder($author$project$Home$GotValues2)),
 					$elm$html$Html$Events$onClick($author$project$Home$Pick)
 				]),
 			$author$project$Home$hoverStyle(model.hover)),
@@ -6038,11 +6191,20 @@ var $author$project$Home$dropbox = function (model) {
 					]))
 			]));
 };
+var $author$project$Home$fileInputDecoder = function (msg) {
+	return A2(
+		$elm$json$Json$Decode$map,
+		msg,
+		A2(
+			$elm$json$Json$Decode$at,
+			_List_fromArray(
+				['target', 'files']),
+			$elm$json$Json$Decode$list($elm$json$Json$Decode$value)));
+};
 var $author$project$Home$DeleteFile = function (a) {
 	return {$: 'DeleteFile', a: a};
 };
 var $elm$html$Html$button = _VirtualDom_node('button');
-var $elm$core$Debug$toString = _Debug_toString;
 var $elm$html$Html$img = _VirtualDom_node('img');
 var $elm$html$Html$Attributes$src = function (url) {
 	return A2(
@@ -6092,16 +6254,6 @@ var $author$project$Home$filesList = F2(
 		var items = A2($elm$core$List$indexedMap, getItem, filesAndUrls);
 		return A2($elm$html$Html$div, _List_Nil, items);
 	});
-var $author$project$Home$filesToValues = function (msg) {
-	return A2(
-		$elm$json$Json$Decode$map,
-		msg,
-		A2(
-			$elm$json$Json$Decode$at,
-			_List_fromArray(
-				['target', 'files']),
-			$elm$json$Json$Decode$list($elm$json$Json$Decode$value)));
-};
 var $elm$html$Html$input = _VirtualDom_node('input');
 var $elm$html$Html$label = _VirtualDom_node('label');
 var $elm$json$Json$Encode$bool = _Json_wrap;
@@ -6240,15 +6392,6 @@ var $author$project$Home$curToStyle = function (cur) {
 			return '';
 	}
 };
-var $joakin$elm_canvas$Canvas$Texture$dimensions = function (texture) {
-	if (texture.$ === 'TImage') {
-		var image = texture.a;
-		return {height: image.height, width: image.width};
-	} else {
-		var data = texture.a;
-		return {height: data.height, width: data.width};
-	}
-};
 var $joakin$elm_canvas$Canvas$Internal$Canvas$Fill = function (a) {
 	return {$: 'Fill', a: a};
 };
@@ -6284,6 +6427,10 @@ var $avh4$elm_color$Color$rgb255 = F3(
 			$avh4$elm_color$Color$scaleFrom255(g),
 			$avh4$elm_color$Color$scaleFrom255(b),
 			1.0);
+	});
+var $avh4$elm_color$Color$rgba = F4(
+	function (r, g, b, a) {
+		return A4($avh4$elm_color$Color$RgbaSpace, r, g, b, a);
 	});
 var $elm$core$Basics$round = _Basics_round;
 var $joakin$elm_canvas$Canvas$Internal$Canvas$DrawableShapes = function (a) {
@@ -7117,13 +7264,15 @@ var $joakin$elm_canvas$Canvas$toHtml = F3(
 			attrs,
 			entities);
 	});
-var $avh4$elm_color$Color$white = A4($avh4$elm_color$Color$RgbaSpace, 255 / 255, 255 / 255, 255 / 255, 1.0);
 var $author$project$Home$photoEditor = F2(
 	function (cur, photo) {
 		var texture = photo.texture;
 		var crop = photo.crop;
 		var size = photo.size;
 		var dim = $joakin$elm_canvas$Canvas$Texture$dimensions(texture);
+		var _v0 = crop;
+		var crop_x = _v0.a;
+		var crop_y = _v0.b;
 		return A3(
 			$joakin$elm_canvas$Canvas$toHtml,
 			_Utils_Tuple2(
@@ -7162,11 +7311,31 @@ var $author$project$Home$photoEditor = F2(
 					$joakin$elm_canvas$Canvas$shapes,
 					_List_fromArray(
 						[
-							$joakin$elm_canvas$Canvas$Settings$fill($avh4$elm_color$Color$white)
+							$joakin$elm_canvas$Canvas$Settings$fill(
+							A4($avh4$elm_color$Color$rgba, 1, 1, 1, 0.65))
 						]),
 					_List_fromArray(
 						[
-							A3($joakin$elm_canvas$Canvas$rect, crop, size.w, size.h)
+							A3(
+							$joakin$elm_canvas$Canvas$rect,
+							_Utils_Tuple2(0, 0),
+							dim.width,
+							crop_y),
+							A3(
+							$joakin$elm_canvas$Canvas$rect,
+							_Utils_Tuple2(0, crop_y),
+							crop_x,
+							size.h),
+							A3(
+							$joakin$elm_canvas$Canvas$rect,
+							_Utils_Tuple2(crop_x + size.w, crop_y),
+							dim.width,
+							size.h),
+							A3(
+							$joakin$elm_canvas$Canvas$rect,
+							_Utils_Tuple2(0, crop_y + size.h),
+							dim.width,
+							dim.height)
 						])),
 					A2(
 					$joakin$elm_canvas$Canvas$shapes,
@@ -7234,7 +7403,7 @@ var $author$project$Home$view = function (model) {
 										A2(
 										$elm$html$Html$Events$on,
 										'change',
-										$author$project$Home$filesToValues($author$project$Home$GotValues2)),
+										$author$project$Home$fileInputDecoder($author$project$Home$GotValues2)),
 										$elm$html$Html$Attributes$value('')
 									]),
 								_List_Nil),
