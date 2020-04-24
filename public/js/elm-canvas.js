@@ -9,8 +9,34 @@ if (window["customElements"]) {
       }
 
       set cmds(values) {
-        this.commands = values;
-        this.render();
+
+        if (this.commands.length !== values.length){
+
+          this.commands = values;
+          this.render();
+
+        } else if (
+          values.some((cmd,i)=>{
+            const _cmd = this.commands[i]
+            if (cmd.type!==_cmd.type) {return true}
+            if (cmd.name!==_cmd.name) {return true}
+            if (cmd.type==='function'){
+              if (cmd.args.length!==_cmd.args.length) {return true}
+              for (let a = 0, l = cmd.args.length; a<l;a++)
+                if (cmd.args[a]!==_cmd.args[a]) {return true}
+            } else if (cmd.type==='field') {
+              if (cmd.value!==_cmd.value) {return true}
+            }
+          })
+        ) {
+
+          this.commands = values;
+          this.render();
+
+        }
+
+        // this.commands = values;
+        // this.render();
       }
 
       static get observedAttributes() {
@@ -69,7 +95,7 @@ if (window["customElements"]) {
         for (let i = this.commands.length - 1; i >= 0; i--) {
           this.execCommand(this.commands[i]);
         }
-        this.commands = [];
+        // this.commands = [];
       }
 
       execCommand(cmd) {
