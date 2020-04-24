@@ -5431,12 +5431,14 @@ var $author$project$Home$subscriptions = function (_v0) {
 	return $author$project$Home$recvImage($author$project$Home$recvFileDecoder);
 };
 var $author$project$Home$Cross = {$: 'Cross'};
-var $author$project$Home$DragMove = function (a) {
-	return {$: 'DragMove', a: a};
-};
-var $author$project$Home$DragSize = function (a) {
-	return {$: 'DragSize', a: a};
-};
+var $author$project$Home$DragMove = F2(
+	function (a, b) {
+		return {$: 'DragMove', a: a, b: b};
+	});
+var $author$project$Home$DragSize = F2(
+	function (a, b) {
+		return {$: 'DragSize', a: a, b: b};
+	});
 var $author$project$Home$Fill = {$: 'Fill'};
 var $author$project$Home$GotFiles = F2(
 	function (a, b) {
@@ -5445,6 +5447,10 @@ var $author$project$Home$GotFiles = F2(
 var $author$project$Home$GotFilesUrls = function (a) {
 	return {$: 'GotFilesUrls', a: a};
 };
+var $author$project$Home$MouseMove = F2(
+	function (a, b) {
+		return {$: 'MouseMove', a: a, b: b};
+	});
 var $author$project$Home$Move = {$: 'Move'};
 var $author$project$Home$Print = F4(
 	function (q, size, crop, mode) {
@@ -5480,6 +5486,11 @@ var $author$project$Home$clampPoint = F2(
 		return _Utils_Tuple2(
 			A3($author$project$Home$lim, x, x + w, px),
 			A3($author$project$Home$lim, y, y + h, py));
+	});
+var $elm$core$Basics$composeR = F3(
+	function (f, g, x) {
+		return g(
+			f(x));
 	});
 var $author$project$Home$deltaPoint = F2(
 	function (_v0, _v1) {
@@ -5517,6 +5528,26 @@ var $elm$file$File$Select$files = F2(
 			},
 			_File_uploadOneOrMore(mimes));
 	});
+var $elm$core$List$filter = F2(
+	function (isGood, list) {
+		return A3(
+			$elm$core$List$foldr,
+			F2(
+				function (x, xs) {
+					return isGood(x) ? A2($elm$core$List$cons, x, xs) : xs;
+				}),
+			_List_Nil,
+			list);
+	});
+var $elm$core$List$head = function (list) {
+	if (list.b) {
+		var x = list.a;
+		var xs = list.b;
+		return $elm$core$Maybe$Just(x);
+	} else {
+		return $elm$core$Maybe$Nothing;
+	}
+};
 var $elm$core$Basics$not = _Basics_not;
 var $author$project$Home$inBox = F3(
 	function (_v0, _v1, _v2) {
@@ -5528,7 +5559,6 @@ var $author$project$Home$inBox = F3(
 		var y = _v2.b;
 		return !((_Utils_cmp(x, left) < 0) || ((_Utils_cmp(y, top) < 0) || ((_Utils_cmp(x, left + width) > 0) || (_Utils_cmp(y, top + height) > 0))));
 	});
-var $elm$core$Debug$log = _Debug_log;
 var $elm$core$List$maximum = function (list) {
 	if (list.b) {
 		var x = list.a;
@@ -5561,6 +5591,8 @@ var $author$project$Home$mul = F2(
 		var y = _v0.b;
 		return _Utils_Tuple2(m * x, m * y);
 	});
+var $elm$file$File$name = _File_name;
+var $elm$core$Basics$neq = _Utils_notEqual;
 var $elm$core$Tuple$pair = F2(
 	function (a, b) {
 		return _Utils_Tuple2(a, b);
@@ -5773,7 +5805,6 @@ var $author$project$Home$sendFiles = _Platform_outgoingPort(
 var $author$project$Home$sendValues = _Platform_outgoingPort(
 	'sendValues',
 	$elm$json$Json$Encode$list($elm$core$Basics$identity));
-var $elm$core$Debug$toString = _Debug_toString;
 var $elm$file$File$toUrl = _File_toUrl;
 var $author$project$Home$zip = F2(
 	function (a, b) {
@@ -5781,289 +5812,355 @@ var $author$project$Home$zip = F2(
 	});
 var $author$project$Home$update = F2(
 	function (msg, model) {
-		switch (msg.$) {
-			case 'NoOp':
-				return _Utils_Tuple2(model, $elm$core$Platform$Cmd$none);
-			case 'MouseDown':
-				var photo = msg.a;
-				var p = msg.b;
-				var size_p = A2(
-					$author$project$Home$addPoint,
-					photo.crop,
-					_Utils_Tuple2(photo.size.w - 4, photo.size.h - 4));
-				return A3(
-					$author$project$Home$inBox,
-					size_p,
-					_Utils_Tuple2(8, 8),
-					p) ? _Utils_Tuple2(
-					_Utils_update(
-						model,
-						{
-							dragging: $author$project$Home$DragSize(
-								A2($author$project$Home$deltaPoint, size_p, p))
-						}),
-					$elm$core$Platform$Cmd$none) : (A3(
-					$author$project$Home$inBox,
-					photo.crop,
-					_Utils_Tuple2(photo.size.w, photo.size.h),
-					p) ? _Utils_Tuple2(
-					_Utils_update(
-						model,
-						{
-							dragging: $author$project$Home$DragMove(
-								A2($author$project$Home$deltaPoint, photo.crop, p))
-						}),
-					$elm$core$Platform$Cmd$none) : _Utils_Tuple2(model, $elm$core$Platform$Cmd$none));
-			case 'MouseMove':
-				var photo = msg.a;
-				var crop = photo.crop;
-				var p = msg.b;
-				var x = p.a;
-				var y = p.b;
-				var _v1 = crop;
-				var crop_x = _v1.a;
-				var crop_y = _v1.b;
-				var _v2 = model.dragging;
-				switch (_v2.$) {
-					case 'DragNone':
-						var size_p = A2(
-							$author$project$Home$addPoint,
-							crop,
-							_Utils_Tuple2(photo.size.w - 4, photo.size.h - 4));
-						var cur = A3(
-							$author$project$Home$inBox,
-							size_p,
-							_Utils_Tuple2(8, 8),
-							p) ? $author$project$Home$Cross : (A3(
-							$author$project$Home$inBox,
-							crop,
-							_Utils_Tuple2(photo.size.w, photo.size.h),
-							p) ? $author$project$Home$Move : $author$project$Home$Null);
-						return _Utils_Tuple2(
-							_Utils_update(
-								model,
-								{cursor: cur}),
-							$elm$core$Platform$Cmd$none);
-					case 'DragMove':
-						var dp = _v2.a;
-						var dim = $joakin$elm_canvas$Canvas$Texture$dimensions(photo.texture);
-						return _Utils_Tuple2(
-							_Utils_update(
-								model,
-								{
-									textures: A2(
-										$elm$core$List$map,
-										function (ph) {
-											var id = ph.id;
-											return _Utils_eq(id, photo.id) ? _Utils_update(
-												photo,
-												{
-													crop: A2(
-														$author$project$Home$clampPoint,
-														{h: dim.height - photo.size.h, w: dim.width - photo.size.w, x: 0, y: 0},
-														A2($author$project$Home$deltaPoint, dp, p))
-												}) : ph;
-										},
-										model.textures)
-								}),
-							$elm$core$Platform$Cmd$none);
-					default:
-						var _v3 = _v2.a;
-						var dx = _v3.a;
-						var dy = _v3.b;
-						var s = _Utils_Tuple2(photo.size.w, photo.size.h);
-						var _v4 = A2(
-							$author$project$Home$mul,
-							A2(
-								$author$project$Home$dot,
-								s,
-								_Utils_Tuple2(((x - crop_x) - dx) + 4, ((y - crop_y) - dy) + 4)) / A2($author$project$Home$dot, s, s),
-							s);
-						var new_w = _v4.a;
-						var new_h = _v4.b;
-						var _v5 = A2(
-							$elm$core$Debug$log,
-							'aspect',
-							$elm$core$Debug$toString(new_w / new_h));
-						return _Utils_Tuple2(
-							_Utils_update(
-								model,
-								{
-									textures: A2(
-										$elm$core$List$map,
-										function (ph) {
-											var id = ph.id;
-											return _Utils_eq(id, photo.id) ? _Utils_update(
-												photo,
-												{
-													size: {h: new_h, w: new_w}
-												}) : ph;
-										},
-										model.textures)
-								}),
-							$elm$core$Platform$Cmd$none);
-				}
-			case 'MouseUp':
-				return _Utils_Tuple2(
-					_Utils_update(
-						model,
-						{dragging: $author$project$Home$DragNone}),
-					$elm$core$Platform$Cmd$none);
-			case 'Pick':
-				return _Utils_Tuple2(
-					model,
-					A2(
-						$elm$file$File$Select$files,
-						_List_fromArray(
-							['image/*']),
-						$author$project$Home$GotFiles));
-			case 'DragEnter':
-				return _Utils_Tuple2(
-					_Utils_update(
-						model,
-						{hover: true}),
-					$elm$core$Platform$Cmd$none);
-			case 'DragLeave':
-				return _Utils_Tuple2(
-					_Utils_update(
-						model,
-						{hover: false}),
-					$elm$core$Platform$Cmd$none);
-			case 'GotValues2':
-				var values = msg.a;
-				return _Utils_Tuple2(
-					_Utils_update(
-						model,
-						{hover: false}),
-					$author$project$Home$sendValues(values));
-			case 'GotFiles':
-				var f = msg.a;
-				var fs = msg.b;
-				var files = A2($elm$core$List$cons, f, fs);
-				var _v6 = A2($elm$core$Debug$log, 'GotFiles', files);
-				return _Utils_Tuple2(
-					_Utils_update(
-						model,
-						{hover: false, loading: true}),
-					A2(
-						$elm$core$Task$perform,
-						$author$project$Home$GotFilesUrls,
-						A2(
-							$elm$core$Task$map,
-							$elm$core$Tuple$pair(files),
-							$elm$core$Task$sequence(
-								A2($elm$core$List$map, $elm$file$File$toUrl, files)))));
-			case 'GotFilesUrls':
-				var _v7 = msg.a;
-				var files = _v7.a;
-				var urls = _v7.b;
-				var maxIndex = A2(
-					$author$project$Home$maxOr,
-					0,
-					A2($elm$core$List$map, $elm$core$Tuple$first, model.photos));
-				return _Utils_Tuple2(
-					_Utils_update(
-						model,
-						{
-							loading: false,
-							photos: _Utils_ap(
-								model.photos,
-								A2(
-									$author$project$Home$zip,
-									A2(
-										$elm$core$List$range,
-										maxIndex + 1,
-										maxIndex + $elm$core$List$length(files)),
-									files))
-						}),
-					$author$project$Home$sendFiles(
-						_Utils_Tuple2(maxIndex + 1, urls)));
-			case 'DeleteFile':
-				var n = msg.a;
-				return _Utils_Tuple2(
-					_Utils_update(
-						model,
-						{
-							files: A2($author$project$Home$removeAt, n, model.files),
-							previews: A2($author$project$Home$removeAt, n, model.previews)
-						}),
-					$elm$core$Platform$Cmd$none);
-			default:
-				var _v8 = msg.a;
-				var file = _v8.a;
-				var img = _v8.b;
-				var _v9 = $joakin$elm_canvas$Canvas$Texture$dimensions(img);
-				var width = _v9.width;
-				var height = _v9.height;
-				var print = function () {
-					if (_Utils_cmp(width, height) > 0) {
-						if (_Utils_cmp(width / height, 152 / 102) > 0) {
-							var w = (152 * height) / 102;
-							var x = (width - w) / (2 * width);
-							return A4(
-								$author$project$Home$Print,
-								1,
-								_Utils_Tuple2(152, 102),
-								{h: 1, w: w / width, x: x, y: 0},
-								$author$project$Home$Fill);
-						} else {
-							var h = (102 * width) / 152;
-							var y = (height - h) / (2 * height);
-							return A4(
-								$author$project$Home$Print,
-								1,
-								_Utils_Tuple2(152, 102),
-								{h: h / height, w: 1, x: 0, y: y},
-								$author$project$Home$Fill);
-						}
-					} else {
-						if (_Utils_cmp(height / width, 152 / 102) > 0) {
-							var h = (152 * width) / 102;
-							var y = (height - h) / (2 * height);
-							return A4(
-								$author$project$Home$Print,
-								1,
-								_Utils_Tuple2(102, 152),
-								{h: h / height, w: 1, x: 0, y: y},
-								$author$project$Home$Fill);
-						} else {
-							var w = (102 * height) / 152;
-							var x = (width - w) / (2 * width);
-							return A4(
-								$author$project$Home$Print,
-								1,
-								_Utils_Tuple2(102, 152),
-								{h: 1, w: w / width, x: x, y: 0},
-								$author$project$Home$Fill);
-						}
-					}
-				}();
-				var _v10 = A2(
-					$elm$core$Debug$log,
-					'dims',
-					$elm$core$Debug$toString(
-						_Utils_Tuple2(width, height)));
-				return _Utils_Tuple2(
-					_Utils_update(
-						model,
-						{
-							textureCount: model.textureCount + 1,
-							textures: _Utils_ap(
-								model.textures,
-								_List_fromArray(
-									[
+		update:
+		while (true) {
+			switch (msg.$) {
+				case 'NoOp':
+					return _Utils_Tuple2(model, $elm$core$Platform$Cmd$none);
+				case 'MouseDown':
+					var photo = msg.a;
+					var p = msg.b;
+					var size_p = A2(
+						$author$project$Home$addPoint,
+						photo.crop,
+						_Utils_Tuple2(photo.size.w - 4, photo.size.h - 4));
+					return A3(
+						$author$project$Home$inBox,
+						size_p,
+						_Utils_Tuple2(8, 8),
+						p) ? _Utils_Tuple2(
+						_Utils_update(
+							model,
+							{
+								dragging: A2(
+									$author$project$Home$DragSize,
+									photo,
+									A2($author$project$Home$deltaPoint, size_p, p))
+							}),
+						$elm$core$Platform$Cmd$none) : (A3(
+						$author$project$Home$inBox,
+						photo.crop,
+						_Utils_Tuple2(photo.size.w, photo.size.h),
+						p) ? _Utils_Tuple2(
+						_Utils_update(
+							model,
+							{
+								dragging: A2(
+									$author$project$Home$DragMove,
+									photo,
+									A2($author$project$Home$deltaPoint, photo.crop, p))
+							}),
+						$elm$core$Platform$Cmd$none) : _Utils_Tuple2(model, $elm$core$Platform$Cmd$none));
+				case 'MouseMove':
+					var photo = msg.a;
+					var crop = photo.crop;
+					var id = photo.id;
+					var p = msg.b;
+					var x = p.a;
+					var y = p.b;
+					var _v1 = model.dragging;
+					switch (_v1.$) {
+						case 'DragNone':
+							var size_handle_p = A2(
+								$author$project$Home$addPoint,
+								crop,
+								_Utils_Tuple2(photo.size.w - 4, photo.size.h - 4));
+							var cur = A3(
+								$author$project$Home$inBox,
+								size_handle_p,
+								_Utils_Tuple2(8, 8),
+								p) ? $author$project$Home$Cross : (A3(
+								$author$project$Home$inBox,
+								crop,
+								_Utils_Tuple2(photo.size.w, photo.size.h),
+								p) ? $author$project$Home$Move : $author$project$Home$Null);
+							return _Utils_Tuple2(
+								_Utils_update(
+									model,
+									{cursor: cur}),
+								$elm$core$Platform$Cmd$none);
+						case 'DragMove':
+							var curPhoto = _v1.a;
+							var dp = _v1.b;
+							if (_Utils_eq(curPhoto.id, id)) {
+								var dim = $joakin$elm_canvas$Canvas$Texture$dimensions(photo.texture);
+								return _Utils_Tuple2(
+									_Utils_update(
+										model,
 										{
-										crop: _Utils_Tuple2(print.crop.x * width, print.crop.y * height),
-										file: file,
-										id: model.textureCount,
-										prints: _List_fromArray(
-											[print]),
-										size: {h: print.crop.h * height, w: print.crop.w * width},
-										texture: img
-									}
-									]))
-						}),
-					$elm$core$Platform$Cmd$none);
+											textures: A2(
+												$elm$core$List$map,
+												function (ph) {
+													return _Utils_eq(ph.id, id) ? _Utils_update(
+														photo,
+														{
+															crop: A2(
+																$author$project$Home$clampPoint,
+																{h: dim.height - photo.size.h, w: dim.width - photo.size.w, x: 0, y: 0},
+																A2($author$project$Home$deltaPoint, dp, p))
+														}) : ph;
+												},
+												model.textures)
+										}),
+									$elm$core$Platform$Cmd$none);
+							} else {
+								return _Utils_Tuple2(model, $elm$core$Platform$Cmd$none);
+							}
+						default:
+							var curPhoto = _v1.a;
+							var _v2 = _v1.b;
+							var dx = _v2.a;
+							var dy = _v2.b;
+							if (_Utils_eq(curPhoto.id, id)) {
+								var s = _Utils_Tuple2(photo.size.w, photo.size.h);
+								var dim = $joakin$elm_canvas$Canvas$Texture$dimensions(photo.texture);
+								var _v3 = crop;
+								var crop_x = _v3.a;
+								var crop_y = _v3.b;
+								var max_x = dim.width - crop_x;
+								var proj = A2(
+									$author$project$Home$mul,
+									A2(
+										$author$project$Home$dot,
+										s,
+										_Utils_Tuple2(((x - crop_x) - dx) + 4, ((y - crop_y) - dy) + 4)) / A2($author$project$Home$dot, s, s),
+									s);
+								var proj_x = proj.a;
+								var max_y = dim.height - crop_y;
+								var sp = function () {
+									var ratio = photo.size.w / photo.size.h;
+									var sx_cross_max_y = ratio * max_y;
+									return (_Utils_cmp(sx_cross_max_y, max_x) > 0) ? _Utils_Tuple2(max_x, (1 / ratio) * max_x) : _Utils_Tuple2(sx_cross_max_y, max_y);
+								}();
+								var sx = sp.a;
+								var _v4 = (_Utils_cmp(proj_x, sx) < 0) ? proj : sp;
+								var new_w = _v4.a;
+								var new_h = _v4.b;
+								return _Utils_Tuple2(
+									_Utils_update(
+										model,
+										{
+											textures: A2(
+												$elm$core$List$map,
+												function (ph) {
+													return _Utils_eq(ph.id, id) ? _Utils_update(
+														photo,
+														{
+															size: {h: new_h, w: new_w}
+														}) : ph;
+												},
+												model.textures)
+										}),
+									$elm$core$Platform$Cmd$none);
+							} else {
+								return _Utils_Tuple2(model, $elm$core$Platform$Cmd$none);
+							}
+					}
+				case 'MouseUp':
+					return _Utils_Tuple2(
+						_Utils_update(
+							model,
+							{dragging: $author$project$Home$DragNone}),
+						$elm$core$Platform$Cmd$none);
+				case 'Pick':
+					return _Utils_Tuple2(
+						model,
+						A2(
+							$elm$file$File$Select$files,
+							_List_fromArray(
+								['image/*']),
+							$author$project$Home$GotFiles));
+				case 'DragEnter':
+					return _Utils_Tuple2(
+						_Utils_update(
+							model,
+							{hover: true}),
+						$elm$core$Platform$Cmd$none);
+				case 'DragLeave':
+					return _Utils_Tuple2(
+						_Utils_update(
+							model,
+							{hover: false}),
+						$elm$core$Platform$Cmd$none);
+				case 'GotValues2':
+					var values = msg.a;
+					return _Utils_Tuple2(
+						_Utils_update(
+							model,
+							{hover: false}),
+						$author$project$Home$sendValues(values));
+				case 'GotFiles':
+					var f = msg.a;
+					var fs = msg.b;
+					var files = A2($elm$core$List$cons, f, fs);
+					return _Utils_Tuple2(
+						_Utils_update(
+							model,
+							{hover: false, loading: true}),
+						A2(
+							$elm$core$Task$perform,
+							$author$project$Home$GotFilesUrls,
+							A2(
+								$elm$core$Task$map,
+								$elm$core$Tuple$pair(files),
+								$elm$core$Task$sequence(
+									A2($elm$core$List$map, $elm$file$File$toUrl, files)))));
+				case 'GotFilesUrls':
+					var _v5 = msg.a;
+					var files = _v5.a;
+					var urls = _v5.b;
+					var maxIndex = A2(
+						$author$project$Home$maxOr,
+						0,
+						A2($elm$core$List$map, $elm$core$Tuple$first, model.photos));
+					return _Utils_Tuple2(
+						_Utils_update(
+							model,
+							{
+								loading: false,
+								photos: _Utils_ap(
+									model.photos,
+									A2(
+										$author$project$Home$zip,
+										A2(
+											$elm$core$List$range,
+											maxIndex + 1,
+											maxIndex + $elm$core$List$length(files)),
+										files))
+							}),
+						$author$project$Home$sendFiles(
+							_Utils_Tuple2(maxIndex + 1, urls)));
+				case 'DeleteFile':
+					var n = msg.a;
+					return _Utils_Tuple2(
+						_Utils_update(
+							model,
+							{
+								files: A2($author$project$Home$removeAt, n, model.files),
+								previews: A2($author$project$Home$removeAt, n, model.previews)
+							}),
+						$elm$core$Platform$Cmd$none);
+				case 'Rename':
+					var photo = msg.a;
+					var newName = msg.b;
+					return _Utils_Tuple2(
+						_Utils_update(
+							model,
+							{
+								textures: A2(
+									$elm$core$List$map,
+									function (ph) {
+										return _Utils_eq(ph.id, photo.id) ? _Utils_update(
+											photo,
+											{name: newName}) : ph;
+									},
+									model.textures)
+							}),
+						$elm$core$Platform$Cmd$none);
+				case 'Turn':
+					var photo = msg.a;
+					return _Utils_Tuple2(model, $elm$core$Platform$Cmd$none);
+				case 'Delete':
+					var id = msg.a;
+					var _v6 = $elm$core$List$head(model.textures);
+					if (_v6.$ === 'Nothing') {
+						return _Utils_Tuple2(model, $elm$core$Platform$Cmd$none);
+					} else {
+						var photo = _v6.a;
+						var $temp$msg = A2(
+							$author$project$Home$MouseMove,
+							photo,
+							_Utils_Tuple2(1, 1)),
+							$temp$model = _Utils_update(
+							model,
+							{
+								textures: A2(
+									$elm$core$List$filter,
+									A2(
+										$elm$core$Basics$composeR,
+										function ($) {
+											return $.id;
+										},
+										$elm$core$Basics$neq(id)),
+									model.textures)
+							});
+						msg = $temp$msg;
+						model = $temp$model;
+						continue update;
+					}
+				default:
+					var _v7 = msg.a;
+					var file = _v7.a;
+					var img = _v7.b;
+					var _v8 = $joakin$elm_canvas$Canvas$Texture$dimensions(img);
+					var width = _v8.width;
+					var height = _v8.height;
+					var print = function () {
+						if (_Utils_cmp(width, height) > 0) {
+							if (_Utils_cmp(width / height, 152 / 102) > 0) {
+								var w = (152 * height) / 102;
+								var x = (width - w) / (2 * width);
+								return A4(
+									$author$project$Home$Print,
+									1,
+									_Utils_Tuple2(152, 102),
+									{h: 1, w: w / width, x: x, y: 0},
+									$author$project$Home$Fill);
+							} else {
+								var h = (102 * width) / 152;
+								var y = (height - h) / (2 * height);
+								return A4(
+									$author$project$Home$Print,
+									1,
+									_Utils_Tuple2(152, 102),
+									{h: h / height, w: 1, x: 0, y: y},
+									$author$project$Home$Fill);
+							}
+						} else {
+							if (_Utils_cmp(height / width, 152 / 102) > 0) {
+								var h = (152 * width) / 102;
+								var y = (height - h) / (2 * height);
+								return A4(
+									$author$project$Home$Print,
+									1,
+									_Utils_Tuple2(102, 152),
+									{h: h / height, w: 1, x: 0, y: y},
+									$author$project$Home$Fill);
+							} else {
+								var w = (102 * height) / 152;
+								var x = (width - w) / (2 * width);
+								return A4(
+									$author$project$Home$Print,
+									1,
+									_Utils_Tuple2(102, 152),
+									{h: 1, w: w / width, x: x, y: 0},
+									$author$project$Home$Fill);
+							}
+						}
+					}();
+					return _Utils_Tuple2(
+						_Utils_update(
+							model,
+							{
+								textureCount: model.textureCount + 1,
+								textures: _Utils_ap(
+									model.textures,
+									_List_fromArray(
+										[
+											{
+											crop: _Utils_Tuple2(print.crop.x * width, print.crop.y * height),
+											file: file,
+											id: model.textureCount,
+											name: $elm$file$File$name(file),
+											prints: _List_fromArray(
+												[print]),
+											size: {h: print.crop.h * height, w: print.crop.w * width},
+											texture: img
+										}
+										]))
+							}),
+						$elm$core$Platform$Cmd$none);
+			}
 		}
 	});
 var $author$project$Home$GotValues2 = function (a) {
@@ -6236,7 +6333,7 @@ var $author$project$Home$filesList = F2(
 						[
 							$author$project$Home$viewPreview(p),
 							$elm$html$Html$text(
-							$elm$core$String$fromInt(i + 1) + ('. ' + $elm$core$Debug$toString(f))),
+							$elm$core$String$fromInt(i + 1) + '. '),
 							A2(
 							$elm$html$Html$button,
 							_List_fromArray(
@@ -6369,18 +6466,27 @@ var $mpizenberg$elm_pointer_events$Html$Events$Extra$Mouse$onWithOptions = F3(
 				$mpizenberg$elm_pointer_events$Html$Events$Extra$Mouse$eventDecoder));
 	});
 var $mpizenberg$elm_pointer_events$Html$Events$Extra$Mouse$onUp = A2($mpizenberg$elm_pointer_events$Html$Events$Extra$Mouse$onWithOptions, 'mouseup', $mpizenberg$elm_pointer_events$Html$Events$Extra$Mouse$defaultOptions);
+var $author$project$Home$Delete = function (a) {
+	return {$: 'Delete', a: a};
+};
+var $author$project$Home$Rename = F2(
+	function (a, b) {
+		return {$: 'Rename', a: a, b: b};
+	});
+var $author$project$Home$Turn = function (a) {
+	return {$: 'Turn', a: a};
+};
 var $author$project$Home$MouseDown = F2(
 	function (a, b) {
 		return {$: 'MouseDown', a: a, b: b};
 	});
-var $author$project$Home$MouseMove = F2(
+var $joakin$elm_canvas$Canvas$Internal$Canvas$Circle = F2(
 	function (a, b) {
-		return {$: 'MouseMove', a: a, b: b};
+		return {$: 'Circle', a: a, b: b};
 	});
-var $elm$core$Basics$composeR = F3(
-	function (f, g, x) {
-		return g(
-			f(x));
+var $joakin$elm_canvas$Canvas$circle = F2(
+	function (pos, radius) {
+		return A2($joakin$elm_canvas$Canvas$Internal$Canvas$Circle, pos, radius);
 	});
 var $author$project$Home$curToStyle = function (cur) {
 	switch (cur.$) {
@@ -7264,22 +7370,67 @@ var $joakin$elm_canvas$Canvas$toHtml = F3(
 			attrs,
 			entities);
 	});
-var $author$project$Home$photoEditor = F2(
+var $author$project$Home$canvas = F2(
 	function (cur, photo) {
 		var texture = photo.texture;
 		var crop = photo.crop;
 		var size = photo.size;
 		var dim = $joakin$elm_canvas$Canvas$Texture$dimensions(texture);
+		var crop_size_handle = A2(
+			$joakin$elm_canvas$Canvas$shapes,
+			_List_fromArray(
+				[
+					$joakin$elm_canvas$Canvas$Settings$fill(
+					A3($avh4$elm_color$Color$rgb255, 33, 150, 243))
+				]),
+			_List_fromArray(
+				[
+					A2(
+					$joakin$elm_canvas$Canvas$circle,
+					A2(
+						$author$project$Home$addPoint,
+						crop,
+						_Utils_Tuple2(size.w, size.h)),
+					5)
+				]));
 		var _v0 = crop;
 		var crop_x = _v0.a;
 		var crop_y = _v0.b;
-		return A3(
-			$joakin$elm_canvas$Canvas$toHtml,
-			_Utils_Tuple2(
-				$elm$core$Basics$round(dim.width),
-				$elm$core$Basics$round(dim.height)),
+		var fog = A2(
+			$joakin$elm_canvas$Canvas$shapes,
 			_List_fromArray(
 				[
+					$joakin$elm_canvas$Canvas$Settings$fill(
+					A4($avh4$elm_color$Color$rgba, 1, 1, 1, 0.65))
+				]),
+			_List_fromArray(
+				[
+					A3(
+					$joakin$elm_canvas$Canvas$rect,
+					_Utils_Tuple2(0, 0),
+					dim.width,
+					crop_y),
+					A3(
+					$joakin$elm_canvas$Canvas$rect,
+					_Utils_Tuple2(0, crop_y),
+					crop_x,
+					size.h),
+					A3(
+					$joakin$elm_canvas$Canvas$rect,
+					_Utils_Tuple2(crop_x + size.w, crop_y),
+					dim.width,
+					size.h),
+					A3(
+					$joakin$elm_canvas$Canvas$rect,
+					_Utils_Tuple2(0, crop_y + size.h),
+					dim.width,
+					dim.height)
+				]));
+		return A2(
+			$elm$html$Html$div,
+			_List_fromArray(
+				[
+					$elm$html$Html$Attributes$class('photo-padd'),
 					$mpizenberg$elm_pointer_events$Html$Events$Extra$Mouse$onMove(
 					A2(
 						$elm$core$Basics$composeR,
@@ -7293,72 +7444,151 @@ var $author$project$Home$photoEditor = F2(
 						function ($) {
 							return $.offsetPos;
 						},
-						$author$project$Home$MouseDown(photo))),
-					$elm$html$Html$Attributes$class('photo'),
-					A2(
-					$elm$html$Html$Attributes$style,
-					'cursor',
-					$author$project$Home$curToStyle(cur))
+						$author$project$Home$MouseDown(photo)))
 				]),
 			_List_fromArray(
 				[
 					A3(
-					$joakin$elm_canvas$Canvas$texture,
-					_List_Nil,
-					_Utils_Tuple2(0, 0),
-					texture),
-					A2(
-					$joakin$elm_canvas$Canvas$shapes,
+					$joakin$elm_canvas$Canvas$toHtml,
+					_Utils_Tuple2(
+						$elm$core$Basics$round(dim.width),
+						$elm$core$Basics$round(dim.height)),
 					_List_fromArray(
 						[
-							$joakin$elm_canvas$Canvas$Settings$fill(
-							A4($avh4$elm_color$Color$rgba, 1, 1, 1, 0.65))
-						]),
-					_List_fromArray(
-						[
-							A3(
-							$joakin$elm_canvas$Canvas$rect,
-							_Utils_Tuple2(0, 0),
-							dim.width,
-							crop_y),
-							A3(
-							$joakin$elm_canvas$Canvas$rect,
-							_Utils_Tuple2(0, crop_y),
-							crop_x,
-							size.h),
-							A3(
-							$joakin$elm_canvas$Canvas$rect,
-							_Utils_Tuple2(crop_x + size.w, crop_y),
-							dim.width,
-							size.h),
-							A3(
-							$joakin$elm_canvas$Canvas$rect,
-							_Utils_Tuple2(0, crop_y + size.h),
-							dim.width,
-							dim.height)
-						])),
-					A2(
-					$joakin$elm_canvas$Canvas$shapes,
-					_List_fromArray(
-						[
-							$joakin$elm_canvas$Canvas$Settings$fill(
-							A3($avh4$elm_color$Color$rgb255, 33, 150, 243))
-						]),
-					_List_fromArray(
-						[
-							A3(
-							$joakin$elm_canvas$Canvas$rect,
+							$elm$html$Html$Attributes$class('photo'),
 							A2(
-								$author$project$Home$addPoint,
-								crop,
-								_Utils_Tuple2(size.w - 4, size.h - 4)),
-							8,
-							8)
+							$elm$html$Html$Attributes$style,
+							'cursor',
+							$author$project$Home$curToStyle(cur))
+						]),
+					_List_fromArray(
+						[
+							A3(
+							$joakin$elm_canvas$Canvas$texture,
+							_List_Nil,
+							_Utils_Tuple2(0, 0),
+							texture),
+							fog,
+							crop_size_handle
 						]))
 				]));
 	});
-var $elm$html$Html$Attributes$type_ = $elm$html$Html$Attributes$stringProperty('type');
+var $elm$html$Html$Events$alwaysStop = function (x) {
+	return _Utils_Tuple2(x, true);
+};
+var $elm$virtual_dom$VirtualDom$MayStopPropagation = function (a) {
+	return {$: 'MayStopPropagation', a: a};
+};
+var $elm$html$Html$Events$stopPropagationOn = F2(
+	function (event, decoder) {
+		return A2(
+			$elm$virtual_dom$VirtualDom$on,
+			event,
+			$elm$virtual_dom$VirtualDom$MayStopPropagation(decoder));
+	});
+var $elm$html$Html$Events$targetValue = A2(
+	$elm$json$Json$Decode$at,
+	_List_fromArray(
+		['target', 'value']),
+	$elm$json$Json$Decode$string);
+var $elm$html$Html$Events$onInput = function (tagger) {
+	return A2(
+		$elm$html$Html$Events$stopPropagationOn,
+		'input',
+		A2(
+			$elm$json$Json$Decode$map,
+			$elm$html$Html$Events$alwaysStop,
+			A2($elm$json$Json$Decode$map, tagger, $elm$html$Html$Events$targetValue)));
+};
+var $author$project$Home$printCtrl = function (_v0) {
+	var size = _v0.size;
+	var mode = _v0.mode;
+	var q = _v0.q;
+	var _v1 = size;
+	var print_x = _v1.a;
+	var print_y = _v1.b;
+	return A2(
+		$elm$html$Html$div,
+		_List_Nil,
+		_List_fromArray(
+			[
+				$elm$html$Html$text(
+				$elm$core$String$fromInt(q) + ('шт. ' + (' - ' + ($elm$core$String$fromInt(print_x) + ('mm x ' + ($elm$core$String$fromInt(print_y) + ('mm ' + (_Utils_eq(mode, $author$project$Home$Fill) ? 'Без полей' : 'С полями'))))))))
+			]));
+};
 var $elm$html$Html$Attributes$value = $elm$html$Html$Attributes$stringProperty('value');
+var $author$project$Home$photoEditor = F2(
+	function (cur, photo) {
+		var prints = photo.prints;
+		return A2(
+			$elm$html$Html$div,
+			_List_fromArray(
+				[
+					$elm$html$Html$Attributes$class('photo-editor')
+				]),
+			_List_fromArray(
+				[
+					A2(
+					$elm$html$Html$input,
+					_List_fromArray(
+						[
+							$elm$html$Html$Attributes$value(photo.name),
+							$elm$html$Html$Attributes$class('photo-name'),
+							$elm$html$Html$Events$onInput(
+							$author$project$Home$Rename(photo))
+						]),
+					_List_Nil),
+					A2(
+					$elm$html$Html$div,
+					_List_fromArray(
+						[
+							$elm$html$Html$Attributes$class('photo-center')
+						]),
+					_List_fromArray(
+						[
+							A2($author$project$Home$canvas, cur, photo)
+						])),
+					A2(
+					$elm$html$Html$div,
+					_List_fromArray(
+						[
+							$elm$html$Html$Attributes$class('photo-buttons')
+						]),
+					_List_fromArray(
+						[
+							A2(
+							$elm$html$Html$button,
+							_List_fromArray(
+								[
+									$elm$html$Html$Events$onClick(
+									$author$project$Home$Delete(photo.id))
+								]),
+							_List_fromArray(
+								[
+									$elm$html$Html$text('delete')
+								])),
+							A2(
+							$elm$html$Html$button,
+							_List_fromArray(
+								[
+									$elm$html$Html$Events$onClick(
+									$author$project$Home$Turn(photo))
+								]),
+							_List_fromArray(
+								[
+									$elm$html$Html$text('turn')
+								]))
+						])),
+					A2(
+					$elm$html$Html$div,
+					_List_fromArray(
+						[
+							$elm$html$Html$Attributes$class('prints')
+						]),
+					A2($elm$core$List$map, $author$project$Home$printCtrl, prints))
+				]));
+	});
+var $elm$html$Html$Attributes$type_ = $elm$html$Html$Attributes$stringProperty('type');
 var $author$project$Home$view = function (model) {
 	return A2(
 		$elm$html$Html$div,
@@ -7373,12 +7603,19 @@ var $author$project$Home$view = function (model) {
 				A2($author$project$Home$filesList, model.files, model.previews),
 				A2(
 				$elm$html$Html$div,
-				_List_Nil,
-				A2(
-					$elm$core$List$map,
-					$author$project$Home$photoEditor(model.cursor),
-					model.textures)),
-				$author$project$Home$dropbox(model),
+				_List_fromArray(
+					[
+						$elm$html$Html$Attributes$class('photos')
+					]),
+				_Utils_ap(
+					A2(
+						$elm$core$List$map,
+						$author$project$Home$photoEditor(model.cursor),
+						model.textures),
+					_List_fromArray(
+						[
+							$author$project$Home$dropbox(model)
+						]))),
 				A2(
 				$elm$html$Html$div,
 				_List_fromArray(

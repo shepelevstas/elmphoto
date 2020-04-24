@@ -30,8 +30,11 @@ a {
 .dropbox {
   border-radius: 8px;
   max-width: 400px;
-  max-height: 200px;
-  margin: 10px auto;
+  max-height: 256px;
+  box-sizing: border-box;
+  /* margin: 10px auto; */
+  margin: 50px 10px 0;
+  min-height: 152px;
   padding: 20px;
   display: flex;
   flex-direction: column;
@@ -44,6 +47,43 @@ a {
   border-color: #ccc;
 }
 
+.photos {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-evenly;
+}
+
 .photo canvas {
   box-shadow: 0 0 8px gray;
+}
+
+.photo-editor {
+  display: inline-block;
+}
+
+.photo-name {
+  box-sizing: border-box;
+  padding: .25em 0;
+  margin: .5em 0;
+  /* width: calc(100% - 10px); */
+  width: 100%;
+}
+
+.photo-padd {
+  padding: 0 10px 10px 0;
+  margin: 10px 0 0 10px;
+  display: inline-block;
+}
+
+.photo-center {
+  text-align: center;
+}
+
+.photo-buttons {
+  display: flex;
+  justify-content: space-between;
+}
+
+.photo-buttons > button:only-child {
+  margin: 0 auto;
 }

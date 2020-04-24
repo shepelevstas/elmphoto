@@ -12,10 +12,10 @@ import File exposing (File)
 import File.Select as Select
 import Html exposing (Attribute, Html, button, div, img, input, label, span, text)
 import Html.Attributes exposing (accept, class, multiple, src, style, type_, value)
-import Html.Events exposing (on, onClick, preventDefaultOn)
+import Html.Events exposing (on, onClick, onInput, preventDefaultOn)
 import Html.Events.Extra.Mouse as Mouse
 import Json.Decode as D exposing (Value)
-import List exposing (map)
+import List exposing (filter, map)
 import Task
 
 
@@ -101,6 +101,7 @@ type alias PhotoData =
         }
     , prints : List Print
     , file : File
+    , name : String
     }
 
 
@@ -140,8 +141,8 @@ type alias Rect =
 
 type Drag
     = DragNone
-    | DragMove Point
-    | DragSize Point
+    | DragMove PhotoData Point
+    | DragSize PhotoData Point
 
 
 type alias PrintSize =
@@ -214,6 +215,9 @@ type Msg
     | MouseMove PhotoData Point
     | MouseUp
     | NoOp
+    | Turn PhotoData
+    | Rename PhotoData String
+    | Delete Int
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -228,29 +232,25 @@ update msg model =
                     addPoint photo.crop ( photo.size.w - 4, photo.size.h - 4 )
             in
             if inBox size_p ( 8, 8 ) p then
-                ( { model | dragging = DragSize (deltaPoint size_p p) }, Cmd.none )
+                ( { model | dragging = DragSize photo (deltaPoint size_p p) }, Cmd.none )
 
             else if inBox photo.crop ( photo.size.w, photo.size.h ) p then
-                ( { model | dragging = DragMove (deltaPoint photo.crop p) }
+                ( { model | dragging = DragMove photo (deltaPoint photo.crop p) }
                 , Cmd.none
                 )
 
             else
                 ( model, Cmd.none )
 
-        MouseMove ({ crop } as photo) (( x, y ) as p) ->
-            let
-                ( crop_x, crop_y ) =
-                    crop
-            in
+        MouseMove ({ crop, id } as photo) (( x, y ) as p) ->
             case model.dragging of
                 DragNone ->
                     let
-                        size_p =
+                        size_handle_p =
                             addPoint crop ( photo.size.w - 4, photo.size.h - 4 )
 
                         cur =
-                            if inBox size_p ( 8, 8 ) p then
+                            if inBox size_handle_p ( 8, 8 ) p then
                                 Cross
 
                             else if inBox crop ( photo.size.w, photo.size.h ) p then
@@ -261,85 +261,96 @@ update msg model =
                     in
                     ( { model | cursor = cur }, Cmd.none )
 
-                DragMove dp ->
-                    let
-                        dim =
-                            Canvas.Texture.dimensions photo.texture
-                    in
-                    ( { model
-                        | textures =
-                            map
-                                (\({ id } as ph) ->
-                                    if id == photo.id then
-                                        { photo | crop = deltaPoint dp p |> clampPoint { x = 0, y = 0, w = dim.width - photo.size.w, h = dim.height - photo.size.h } }
+                DragMove curPhoto dp ->
+                    if curPhoto.id == id then
+                        let
+                            dim =
+                                Canvas.Texture.dimensions photo.texture
+                        in
+                        ( { model
+                            | textures =
+                                map
+                                    (\ph ->
+                                        if ph.id == id then
+                                            { photo | crop = deltaPoint dp p |> clampPoint { x = 0, y = 0, w = dim.width - photo.size.w, h = dim.height - photo.size.h } }
 
-                                    else
-                                        ph
-                                )
-                                model.textures
-                      }
-                    , Cmd.none
-                    )
+                                        else
+                                            ph
+                                    )
+                                    model.textures
+                          }
+                        , Cmd.none
+                        )
 
-                DragSize ( dx, dy ) ->
-                    let
-                        {-
-                           vector s : y = (102/152)*x === (size.h/size.w)*x
-                           max point : y = (size.h/size.w) * (dim.width-crop_x)
-                        -}
-                        s =
-                            ( photo.size.w, photo.size.h )
+                    else
+                        ( model, Cmd.none )
 
-                        dim =
-                            Canvas.Texture.dimensions photo.texture
+                DragSize curPhoto ( dx, dy ) ->
+                    if curPhoto.id == id then
+                        let
+                            ( crop_x, crop_y ) =
+                                crop
 
-                        max_x =
-                            dim.width - crop_x
+                            {-
+                               vector s : y = (102/152)*x === (size.h/size.w)*x
+                               max point : y = (size.h/size.w) * (dim.width-crop_x)
+                            -}
+                            s =
+                                ( photo.size.w, photo.size.h )
 
-                        max_y =
-                            dim.height - crop_y
+                            dim =
+                                Canvas.Texture.dimensions photo.texture
 
-                        ( s_x, s_y ) =
-                            let
-                                ratio =
-                                    photo.size.w / photo.size.h
+                            max_x =
+                                dim.width - crop_x
 
-                                sx_cross_max_y =
-                                    ratio * max_y
-                            in
-                            if sx_cross_max_y > max_x then
-                                ( max_x, 1 / ratio * max_x )
+                            max_y =
+                                dim.height - crop_y
 
-                            else
-                                ( sx_cross_max_y, max_y )
+                            (( sx, _ ) as sp) =
+                                let
+                                    ratio =
+                                        photo.size.w / photo.size.h
 
-                        ( proj_w, proj_h ) =
-                            mul (dot s ( x - crop_x - dx + 4, y - crop_y - dy + 4 ) / dot s s) s
+                                    sx_cross_max_y =
+                                        ratio * max_y
+                                in
+                                if sx_cross_max_y > max_x then
+                                    ( max_x, 1 / ratio * max_x )
 
-                        ( new_w, new_h ) =
-                            if proj_w < s_x then
-                                ( proj_w, proj_h )
+                                else
+                                    ( sx_cross_max_y, max_y )
 
-                            else
-                                ( s_x, s_y )
+                            (( proj_x, _ ) as proj) =
+                                mul (dot s ( x - crop_x - dx + 4, y - crop_y - dy + 4 ) / dot s s) s
 
-                        _ =
-                            log "aspect" (Debug.toString <| new_w / new_h)
-                    in
-                    ( { model
-                        | textures =
-                            map
-                                (\({ id } as ph) ->
-                                    if id == photo.id then
-                                        { photo | size = { w = new_w, h = new_h } }
+                            ( new_w, new_h ) =
+                                if proj_x < sx then
+                                    proj
 
-                                    else
-                                        ph
-                                )
-                                model.textures
-                      }
-                    , Cmd.none
-                    )
+                                else
+                                    sp
+
+                            -- _ =
+                            --     log "aspect" (Debug.toString <| new_w / new_h)
+                        in
+                        ( { model
+                            | textures =
+                                map
+                                    (\ph ->
+                                        if ph.id == id then
+                                            { photo | size = { w = new_w, h = new_h } }
+
+                                        else
+                                            ph
+                                    )
+                                    model.textures
+                          }
+                        , Cmd.none
+                        )
+
+                    else
+                        ( model, Cmd.none )
 
         MouseUp ->
             ( { model | dragging = DragNone }, Cmd.none )
@@ -367,9 +378,8 @@ update msg model =
                 files =
                     f :: fs
 
-                _ =
-                    log "GotFiles" files
-
+                -- _ =
+                --     log "GotFiles" files
                 -- maxIndex : List ( Int, File ) -> Int
                 -- maxIndex photos =
                 --     List.map Tuple.first photos
@@ -441,14 +451,46 @@ update msg model =
             , Cmd.none
             )
 
+        Rename photo newName ->
+            ( { model
+                | textures =
+                    map
+                        (\ph ->
+                            if ph.id == photo.id then
+                                { photo | name = newName }
+
+                            else
+                                ph
+                        )
+                        model.textures
+              }
+            , Cmd.none
+            )
+
+        Turn photo ->
+            ( model, Cmd.none )
+
+        Delete id ->
+            -- ( { model
+            --     | textures =
+            --         filter (.id >> (/=) id) model.textures
+            --   }
+            -- , Cmd.none
+            -- )
+            case List.head model.textures of
+                Nothing ->
+                    ( model, Cmd.none )
+
+                Just photo ->
+                    update (MouseMove photo ( 1, 1 )) { model | textures = filter (.id >> (/=) id) model.textures }
+
         RecvImage ( file, img ) ->
             let
                 { width, height } =
                     Canvas.Texture.dimensions img
 
-                _ =
-                    log "dims" (Debug.toString ( width, height ))
-
+                -- _ =
+                --     log "dims" (Debug.toString ( width, height ))
                 print =
                     if width > height then
                         if width / height > 152 / 102 then
@@ -530,6 +572,7 @@ update msg model =
                                 }
                              , prints = [ print ]
                              , file = file
+                             , name = File.name file
                              }
                            ]
               }
@@ -561,8 +604,7 @@ view : Model -> Html Msg
 view model =
     div [ class "elm", Mouse.onUp (always MouseUp) ]
         [ filesList model.files model.previews
-        , div [] (List.map (photoEditor model.cursor) model.textures)
-        , dropbox model
+        , div [ class "photos" ] (List.map (photoEditor model.cursor) model.textures ++ [ dropbox model ])
         , div [ class "dropbox-wrap" ]
             [ label []
                 [ input
@@ -610,32 +652,83 @@ fileInputDecoder msg =
 
 
 photoEditor : Cur -> PhotoData -> Html Msg
-photoEditor cur ({ texture, crop, size } as photo) =
+photoEditor cur ({ prints } as photo) =
+    div [ class "photo-editor" ]
+        [ input
+            [ value photo.name
+            , class "photo-name"
+            , onInput (Rename photo)
+            ]
+            []
+        , div [ class "photo-center" ] [ canvas cur photo ]
+        , div [ class "photo-buttons" ]
+            [ button [ onClick (Delete photo.id) ] [ text "delete" ]
+            , button [ onClick (Turn photo) ] [ text "turn" ]
+            ]
+        , div [ class "prints" ] (map printCtrl prints)
+        ]
+
+
+canvas : Cur -> PhotoData -> Html Msg
+canvas cur ({ texture, crop, size } as photo) =
     let
         dim =
             Canvas.Texture.dimensions texture
 
         ( crop_x, crop_y ) =
             crop
-    in
-    Canvas.toHtml ( round dim.width, round dim.height )
-        [ Mouse.onMove (.offsetPos >> MouseMove photo)
-        , Mouse.onDown (.offsetPos >> MouseDown photo)
 
-        -- , Mouse.onUp MouseUp
-        , class "photo"
-        , style "cursor" (curToStyle cur)
+        fog =
+            Canvas.shapes [ Canvas.Settings.fill (Color.rgba 1 1 1 0.65) ]
+                [ Canvas.rect ( 0, 0 ) dim.width crop_y
+                , Canvas.rect ( 0, crop_y ) crop_x size.h
+                , Canvas.rect ( crop_x + size.w, crop_y ) dim.width size.h
+                , Canvas.rect ( 0, crop_y + size.h ) dim.width dim.height
+                ]
+
+        crop_size_handle =
+            Canvas.shapes [ Canvas.Settings.fill (Color.rgb255 33 150 243) ]
+                [ Canvas.circle (addPoint crop ( size.w, size.h )) 5
+                ]
+    in
+    div
+        [ class "photo-padd"
+        , Mouse.onMove (.offsetPos >> MouseMove photo)
+        , Mouse.onDown (.offsetPos >> MouseDown photo)
         ]
-        [ Canvas.texture [] ( 0, 0 ) texture
-        , Canvas.shapes [ Canvas.Settings.fill (Color.rgba 1 1 1 0.65) ]
-            [ Canvas.rect ( 0, 0 ) dim.width crop_y
-            , Canvas.rect ( 0, crop_y ) crop_x size.h
-            , Canvas.rect ( crop_x + size.w, crop_y ) dim.width size.h
-            , Canvas.rect ( 0, crop_y + size.h ) dim.width dim.height
+        [ Canvas.toHtml ( round dim.width, round dim.height )
+            [ class "photo"
+            , style "cursor" (curToStyle cur)
             ]
-        , Canvas.shapes [ Canvas.Settings.fill (Color.rgb255 33 150 243) ]
-            [ Canvas.rect (addPoint crop ( size.w - 4, size.h - 4 )) 8 8
+            [ Canvas.texture [] ( 0, 0 ) texture
+            , fog
+            , crop_size_handle
             ]
+        ]
+
+
+printCtrl : Print -> Html Msg
+printCtrl { size, mode, q } =
+    let
+        ( print_x, print_y ) =
+            size
+    in
+    div []
+        [ text
+            (String.fromInt q
+                ++ "шт. "
+                ++ " - "
+                ++ String.fromInt print_x
+                ++ "mm x "
+                ++ String.fromInt print_y
+                ++ "mm "
+                ++ (if mode == Fill then
+                        "Без полей"
+
+                    else
+                        "С полями"
+                   )
+            )
         ]
 
 
@@ -648,7 +741,7 @@ filesList files previews =
         getItem i ( f, p ) =
             div []
                 [ viewPreview p
-                , text (String.fromInt (i + 1) ++ ". " ++ Debug.toString f)
+                , text (String.fromInt (i + 1) ++ ". " {- ++ Debug.toString f -})
                 , button [ onClick (DeleteFile i) ] [ text "delete" ]
                 ]
 
