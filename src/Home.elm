@@ -283,15 +283,45 @@ update msg model =
 
                 DragSize ( dx, dy ) ->
                     let
-                        -- w =
-                        --     x - crop_x - dx + 4
-                        -- h =
-                        --     y - crop_y - dy + 4
+                        {-
+                           vector s : y = (102/152)*x === (size.h/size.w)*x
+                           max point : y = (size.h/size.w) * (dim.width-crop_x)
+                        -}
                         s =
                             ( photo.size.w, photo.size.h )
 
-                        ( new_w, new_h ) =
+                        dim =
+                            Canvas.Texture.dimensions photo.texture
+
+                        max_x =
+                            dim.width - crop_x
+
+                        max_y =
+                            dim.height - crop_y
+
+                        ( s_x, s_y ) =
+                            let
+                                ratio =
+                                    photo.size.w / photo.size.h
+
+                                sx_cross_max_y =
+                                    ratio * max_y
+                            in
+                            if sx_cross_max_y > max_x then
+                                ( max_x, 1 / ratio * max_x )
+
+                            else
+                                ( sx_cross_max_y, max_y )
+
+                        ( proj_w, proj_h ) =
                             mul (dot s ( x - crop_x - dx + 4, y - crop_y - dy + 4 ) / dot s s) s
+
+                        ( new_w, new_h ) =
+                            if proj_w < s_x then
+                                ( proj_w, proj_h )
+
+                            else
+                                ( s_x, s_y )
 
                         _ =
                             log "aspect" (Debug.toString <| new_w / new_h)
