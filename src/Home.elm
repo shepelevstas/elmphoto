@@ -1,114 +1,366 @@
 port module Home exposing (main)
 
 -- import List.Extra exposing (find)
+-- import File.Select as Select
+-- import Debug exposing (log)
 
 import Browser
 import Canvas
 import Canvas.Settings
+import Canvas.Settings.Advanced
 import Canvas.Texture exposing (Texture, fromDomImage)
 import Color
-import Debug exposing (log)
 import File exposing (File)
-import File.Select as Select
-import Html exposing (Attribute, Html, button, div, img, input, label, span, text)
-import Html.Attributes exposing (accept, class, multiple, src, style, type_, value)
+import Html exposing (Attribute, Html, button, div, {- img, -} input, label, span, text)
+import Html.Attributes exposing (accept, class, multiple, {- src, -} style, type_, value)
 import Html.Events exposing (on, onClick, onInput, preventDefaultOn)
 import Html.Events.Extra.Mouse as Mouse
+import Html.Keyed as Keyed
+import Html.Lazy exposing (lazy)
 import Json.Decode as D exposing (Value)
 import List exposing (filter, map)
-import Task
+import Tuple exposing (first, second)
+
+
+type alias Point =
+    ( Float, Float )
 
 
 
--- MAIN
+{-
+   type alias Size =
+       { w : Float
+       , h : Float
+       }
+-}
+
+
+type alias Rect =
+    { x : Float
+    , y : Float
+    , w : Float
+    , h : Float
+    }
+
+
+type alias PrintSize =
+    ( Int, Int )
+
+
+
+{-
+   type alias Print =
+       { id : Int
+       , q : Int
+       , mode : CropMode -- Fill | Fit
+       , size : PrintSize -- in mm
+       , crop : Rect -- in percent
+       }
+-}
+{-
+   type alias PhotoData =
+       { id : Int
+       , texture : Texture
+       , crop : { p : Point, size : Size }
+
+       -- , crop : Point
+       -- , size : Size
+       , prints : List Print
+       , file : File
+       , name : String
+       , cur : Cur
+       }
+-}
+-- a new try to draw canvas editor
+
+
+type alias Photo =
+    { id : Int
+    , texture : Texture
+    , size : PrintSize
+    , horizontal : Bool
+    , file : File
+    , name : String
+    , cur : Cur
+    , prints :
+        { list : List Print2
+        , count : Int
+        }
+    , print : Print2
+    }
+
+
+type alias Print2 =
+    { id : Int
+    , size : PrintSize
+    , q : Int
+    , turn : Turn
+    , horizontal : Bool
+    , cropmode : CropMode
+    , xy : Point
+    , wh : Point
+    , canv :
+        { img : Point
+        , scale : Float
+        , print : Maybe Rect
+        , lims : Rect
+        }
+    }
+
+
+type alias PrintConf =
+    { texture : Texture
+    , cropmode : CropMode
+    , printsize : PrintSize
+    }
+
+
+type alias CanvConf =
+    { img : Point
+    , scale : Float
+    , print : Maybe Rect
+    , lims : Rect
+    }
+
+
+calcCanv : PrintConf -> CanvConf
+
+
+
+-- Photo
+-- -> Print2
+-- ->
+--     { img : Point
+--     , scale : Float
+--     , print : Maybe Rect
+--     , lims : Rect
+--     }
+-- calcCanv ({ horizontal } as ph) ({ cropmode } as pr) =
+
+
+calcCanv { texture, cropmode, printsize } =
+    let
+        dim =
+            -- Canvas.Texture.dimensions ph.texture
+            Canvas.Texture.dimensions texture
+
+        horizontal =
+            dim.width > dim.height
+    in
+    case cropmode of
+        Fill ->
+            let
+                lims =
+                    if horizontal then
+                        { x = 10, y = (276 - dim.height) / 2, w = 256, h = dim.height }
+
+                    else
+                        { x = (276 - dim.width) / 2, y = 10, w = dim.width, h = 256 }
+            in
+            { img = ( lims.x, lims.y )
+            , scale = 1
+            , print = Nothing
+            , lims = lims
+            }
+
+        Fit ->
+            let
+                ( print_w, print_h ) =
+                    if horizontal then
+                        -- ( second pr.size, first pr.size )
+                        ( second printsize, first printsize )
+
+                    else
+                        -- pr.size
+                        printsize
+
+                print_ratio =
+                    toFloat print_w / toFloat print_h
+
+                img_ratio =
+                    dim.width / dim.height
+
+                ( lims, scale, img ) =
+                    if horizontal then
+                        let
+                            page_h =
+                                256 / print_ratio
+
+                            ( scale_, img_ ) =
+                                if img_ratio > print_ratio then
+                                    -- img is wider than print
+                                    ( 1, ( 10, (276 - dim.height) / 2 ) )
+
+                                else
+                                    -- print is wider than img
+                                    let
+                                        s =
+                                            page_h / dim.height
+                                    in
+                                    ( s, ( (276 - dim.width * s) / 2, (276 - page_h) / 2 ) )
+                        in
+                        ( { x = 10
+                          , y = (276 - page_h) / 2
+                          , w = 256
+                          , h = page_h
+                          }
+                        , scale_
+                        , img_
+                        )
+
+                    else
+                        -- vertical
+                        let
+                            page_w =
+                                256 * print_ratio
+
+                            ( scale_, img_ ) =
+                                if img_ratio > print_ratio then
+                                    -- img is wider than print
+                                    let
+                                        s =
+                                            page_w / dim.width
+                                    in
+                                    ( s
+                                    , ( (276 - page_w) / 2, (276 - dim.height * s) / 2 )
+                                    )
+
+                                else
+                                    -- print is wider than img
+                                    ( 1, ( (276 - dim.width) / 2, 10 ) )
+                        in
+                        ( { x = (276 - page_w) / 2
+                          , y = 10
+                          , w = page_w
+                          , h = 256
+                          }
+                        , scale_
+                        , img_
+                        )
+            in
+            { img = img
+            , scale = scale
+            , lims = lims
+            , print = Just lims
+            }
+
+
+
+{-
+   if horizontal then
+       let
+           page_h =
+               256 / print_ratio
+
+           lims =
+               { x = 10, y = (276 - page_h) / 2, w = 256, h = page_h }
+       in
+       if img_ratio > print_ratio then
+           { img = ( 10, (276 - dim.height) / 2 )
+           , s = 1
+           , print = Just lims
+           , lims = lims
+           }
+
+       else
+           let
+               img_h =
+                   page_h
+
+               scale =
+                   page_h / dim.height
+
+               img_w =
+                   dim.width * scale
+           in
+           { img = ( (276 - img_w) / 2, (276 - img_h) / 2 )
+           , s = scale
+           , print = Just lims
+           , lims = lims
+           }
+
+   else
+       let
+           page_w =
+               256 * print_ratio
+
+           lims =
+               { x = (276 - page_w) / 2, y = 10, w = page_w, h = 256 }
+       in
+       if img_ratio > print_ratio then
+           let
+               img_w =
+                   page_w
+
+               scale =
+                   page_w / dim.width
+
+               img_h =
+                   dim.height * scale
+           in
+           { img = ( (276 - img_w) / 2, (276 - img_h) / 2 )
+           , s = scale
+           , print = Just lims
+           , lims = lims
+           }
+
+       else
+           { img = ( (276 - dim.width) / 2, 10 )
+           , s = 1
+           , print = Just lims
+           , lims = lims
+           }
+-}
+
+
+type alias Model =
+    { hover : Bool
+
+    -- , photos : List PhotoData
+    , photos : List Photo
+    , photoCount : Int
+    , dragging : Drag
+    }
 
 
 main : Program () Model Msg
 main =
     Browser.element
-        { init = init
+        { init = \_ -> ( Model False [] 0 DragNone, Cmd.none )
         , view = view
         , update = update
-        , subscriptions = subscriptions
+        , subscriptions = \_ -> recvImage recvFileDecoder
         }
 
 
 
 -- PORTS
-
-
-port sendFiles : ( Int, List String ) -> Cmd msg
+-- port sendFiles : ( Int, List String ) -> Cmd msg
 
 
 port sendValues : List Value -> Cmd msg
 
 
-port recvImage : (( D.Value, D.Value ) -> msg) -> Sub msg
+port recvImage : (( D.Value, D.Value, ( Int, Int ) ) -> msg) -> Sub msg
 
 
-subscriptions : Model -> Sub Msg
-subscriptions _ =
-    recvImage recvFileDecoder
-
-
-recvFileDecoder : ( D.Value, D.Value ) -> Msg
-recvFileDecoder ( fileValue, imgValue ) =
-    let
-        fileRes =
-            D.decodeValue File.decoder fileValue
-
-        imgMaybe =
-            Canvas.Texture.fromDomImage imgValue
-    in
-    case fileRes of
-        Ok file ->
-            case imgMaybe of
-                Just img ->
-                    RecvImage ( file, img )
-
-                _ ->
-                    NoOp
+recvFileDecoder : ( D.Value, D.Value, ( Int, Int ) ) -> Msg
+recvFileDecoder ( fileValue, imgValue, originalSize ) =
+    case
+        ( D.decodeValue File.decoder fileValue
+        , Canvas.Texture.fromDomImage imgValue
+        )
+    of
+        ( Ok file, Just img ) ->
+            RecvImage ( file, img, originalSize )
 
         _ ->
             NoOp
 
 
-type alias Model =
-    { hover : Bool
-    , loading : Bool
-    , files : List File
-    , previews : List String
-    , photos : List ( Int, File )
-    , textures : List PhotoData
-    , cursor : Cur
-    , textureCount : Int
-    , dragging : Drag
-    }
-
-
-init : () -> ( Model, Cmd Msg )
-init _ =
-    ( Model False False [] [] [] [] Null 0 DragNone, Cmd.none )
-
-
-type alias PhotoData =
-    { id : Int
-    , texture : Texture
-    , crop : Point
-    , size :
-        { w : Float
-        , h : Float
-        }
-    , prints : List Print
-    , file : File
-    , name : String
-    }
-
-
 type Cur
-    = Move
-      -- | Pointer
-    | Null
+    = Null
+    | Move
     | Cross
 
 
@@ -127,40 +379,24 @@ curToStyle cur =
             ""
 
 
-type alias Point =
-    ( Float, Float )
-
-
-type alias Rect =
-    { x : Float
-    , y : Float
-    , w : Float
-    , h : Float
-    }
-
-
 type Drag
     = DragNone
-    | DragMove PhotoData Point
-    | DragSize PhotoData Point
-
-
-type alias PrintSize =
-    ( Int, Int )
+    | DragMove Photo Point
+    | DragSize Photo Point
 
 
 
 -- ( width in mm, height in mm )
-
-
-printSizes =
-    [ ( 102, 152, "10x15" )
-    , ( 152, 203, "15x20" )
-    , ( 152, 210, "15x21" )
-    , ( 152, 230, "15x23" )
-    , ( 203, 305, "20x30" )
-    , ( 210, 305, "21x30" )
-    ]
+{-
+   printSizes =
+       [ ( 102, 152, "10x15" )
+       , ( 152, 203, "15x20" )
+       , ( 152, 210, "15x21" )
+       , ( 152, 230, "15x23" )
+       , ( 203, 305, "20x30" )
+       , ( 210, 305, "21x30" )
+       ]
+-}
 
 
 type CropMode
@@ -168,22 +404,22 @@ type CropMode
     | Fit -- fit in the whole picture, add white padding
 
 
+
+{-
+   type Orient
+       = Album -- Horizontal, width > height
+       | Port -- Vertical, width < height
+-}
+
+
 type Turn
-    = N -- Original, no turn
-    | E -- 90 deg clockwise turn
-    | W -- 90 deg counter clockwise turn
-    | S -- upside down turn, 180 deg
-
-
-type alias Print =
-    { q : Int
-    , size : PrintSize
-    , crop : Rect
-    , mode : CropMode
-    }
+    = TurnUp -- Original, no turn
 
 
 
+-- | TurnRight -- 90 deg clockwise turn
+-- | TurnLeft -- 90 deg counter-clockwise turn
+-- | TurnDown -- upside down turn, 180 deg
 --    ####          ####
 --    ####          ####
 --    ####          ####
@@ -199,25 +435,21 @@ type alias Print =
 
 
 type Msg
-    = Pick
+    = NoOp
+      -- drag n drop
     | DragEnter
     | DragLeave
-    | GotFiles File (List File)
-      -- | LoadingFiles (List File)
-      -- | GotPreviews (List String)
-    | DeleteFile Int
-    | GotFilesUrls ( List File, List String )
-      -- | GotValues Value (List Value)
-    | GotValues2 (List Value)
-    | RecvImage ( File, Texture )
-      -- | Log Mouse.Event
-    | MouseDown PhotoData Point
-    | MouseMove PhotoData Point
+      -- mouse
+    | MouseDown Photo Point
+    | MouseMove Photo Point
     | MouseUp
-    | NoOp
-    | Turn PhotoData
-    | Rename PhotoData String
+      -- editing
+    | Turn Photo
+    | Rename Photo String
     | Delete Int
+      -- internal
+    | GotFileValues (List Value)
+    | RecvImage ( File, Texture, ( Int, Int ) )
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -226,59 +458,122 @@ update msg model =
         NoOp ->
             ( model, Cmd.none )
 
-        MouseDown photo p ->
+        MouseDown ({ print } as photo) p ->
             let
-                size_p =
-                    addPoint photo.crop ( photo.size.w - 4, photo.size.h - 4 )
-            in
-            if inBox size_p ( 8, 8 ) p then
-                ( { model | dragging = DragSize photo (deltaPoint size_p p) }, Cmd.none )
+                canv =
+                    print.canv
 
-            else if inBox photo.crop ( photo.size.w, photo.size.h ) p then
-                ( { model | dragging = DragMove photo (deltaPoint photo.crop p) }
+                lims =
+                    canv.lims
+
+                crop_x =
+                    first print.xy * lims.w + lims.x
+
+                crop_y =
+                    second print.xy * lims.h + lims.y
+
+                crop_w =
+                    first print.wh * lims.w
+
+                crop_h =
+                    second print.wh * lims.h
+
+                crop_p =
+                    ( crop_x, crop_y )
+
+                crop_size =
+                    ( crop_w, crop_h )
+
+                size_handle_p =
+                    addPoint crop_p ( crop_w - 4, crop_h - 4 )
+            in
+            if inBox size_handle_p ( 8, 8 ) p then
+                ( { model | dragging = DragSize photo (deltaPoint size_handle_p p) }, Cmd.none )
+
+            else if inBox crop_p crop_size p then
+                ( { model | dragging = DragMove photo (deltaPoint crop_p p) }
                 , Cmd.none
                 )
 
             else
                 ( model, Cmd.none )
 
-        MouseMove ({ crop, id } as photo) (( x, y ) as p) ->
+        MouseMove ({ print, id } as photo) (( x, y ) as p) ->
             case model.dragging of
                 DragNone ->
                     let
+                        crop_x =
+                            first print.xy * print.canv.lims.w + print.canv.lims.x
+
+                        crop_y =
+                            second print.xy * print.canv.lims.h + print.canv.lims.y
+
+                        crop_w =
+                            first print.wh * print.canv.lims.w
+
+                        crop_h =
+                            second print.wh * print.canv.lims.h
+
+                        crop =
+                            { p = ( crop_x, crop_y )
+                            , size = { w = crop_w, h = crop_h }
+                            }
+
                         size_handle_p =
-                            addPoint crop ( photo.size.w - 4, photo.size.h - 4 )
+                            addPoint crop.p ( crop.size.w - 4, crop.size.h - 4 )
 
                         cur =
                             if inBox size_handle_p ( 8, 8 ) p then
                                 Cross
 
-                            else if inBox crop ( photo.size.w, photo.size.h ) p then
+                            else if inBox crop.p ( crop.size.w, crop.size.h ) p then
                                 Move
 
                             else
                                 Null
                     in
-                    ( { model | cursor = cur }, Cmd.none )
+                    ( { model
+                        | photos =
+                            map
+                                (\ph ->
+                                    if ph.id == id then
+                                        { ph | cur = cur }
+
+                                    else
+                                        ph
+                                )
+                                model.photos
+                      }
+                    , Cmd.none
+                    )
 
                 DragMove curPhoto dp ->
                     if curPhoto.id == id then
                         let
-                            dim =
-                                Canvas.Texture.dimensions photo.texture
-                        in
-                        ( { model
-                            | textures =
-                                map
-                                    (\ph ->
-                                        if ph.id == id then
-                                            { photo | crop = deltaPoint dp p |> clampPoint { x = 0, y = 0, w = dim.width - photo.size.w, h = dim.height - photo.size.h } }
+                            -- crop_w =
+                            --     first print.wh * print.canv.lims.w
+                            -- crop_h =
+                            --     second print.wh * print.canv.lims.h
+                            -- dim =
+                            --     Canvas.Texture.dimensions photo.texture
+                            ( new_crop_x, new_crop_y ) =
+                                deltaPoint dp p
+                                    |> clampPoint
+                                        { x = 0
+                                        , y = 0
+                                        , w = (1 - first print.wh) * print.canv.lims.w
+                                        , h = (1 - second print.wh) * print.canv.lims.h
+                                        }
 
-                                        else
-                                            ph
-                                    )
-                                    model.textures
-                          }
+                            update_photo : Photo -> Photo
+                            update_photo ph =
+                                if ph.id == id then
+                                    { ph | print = { print | xy = ( new_crop_x / print.canv.lims.w, new_crop_y / print.canv.lims.h ) } }
+
+                                else
+                                    ph
+                        in
+                        ( { model | photos = map update_photo model.photos }
                         , Cmd.none
                         )
 
@@ -288,29 +583,39 @@ update msg model =
                 DragSize curPhoto ( dx, dy ) ->
                     if curPhoto.id == id then
                         let
-                            ( crop_x, crop_y ) =
-                                crop
+                            -- ( crop_x, crop_y ) =
+                            -- crop.p
+                            crop_x =
+                                first print.xy * print.canv.lims.w
 
-                            {-
-                               vector s : y = (102/152)*x === (size.h/size.w)*x
-                               max point : y = (size.h/size.w) * (dim.width-crop_x)
-                            -}
+                            crop_y =
+                                second print.xy * print.canv.lims.h
+
+                            crop_w =
+                                first print.wh * print.canv.lims.w
+
+                            crop_h =
+                                second print.wh * print.canv.lims.h
+
                             s =
-                                ( photo.size.w, photo.size.h )
+                                -- ( photo.crop.size.w, photo.crop.size.h )
+                                ( crop_w, crop_h )
 
-                            dim =
-                                Canvas.Texture.dimensions photo.texture
-
+                            -- dim =
+                            --     Canvas.Texture.dimensions photo.texture
                             max_x =
-                                dim.width - crop_x
+                                -- dim.width - crop_x
+                                print.canv.lims.x + print.canv.lims.w
 
                             max_y =
-                                dim.height - crop_y
+                                -- dim.height - crop_y
+                                print.canv.lims.y + print.canv.lims.h
 
                             (( sx, _ ) as sp) =
                                 let
                                     ratio =
-                                        photo.size.w / photo.size.h
+                                        -- photo.crop.size.w / photo.crop.size.h
+                                        crop_w / crop_h
 
                                     sx_cross_max_y =
                                         ratio * max_y
@@ -335,16 +640,16 @@ update msg model =
                             --     log "aspect" (Debug.toString <| new_w / new_h)
                         in
                         ( { model
-                            | textures =
+                            | photos =
                                 map
                                     (\ph ->
                                         if ph.id == id then
-                                            { photo | size = { w = new_w, h = new_h } }
+                                            { photo | print = { print | wh = ( new_w / print.canv.lims.w, new_h / print.canv.lims.h ) } }
 
                                         else
                                             ph
                                     )
-                                    model.textures
+                                    model.photos
                           }
                         , Cmd.none
                         )
@@ -355,105 +660,18 @@ update msg model =
         MouseUp ->
             ( { model | dragging = DragNone }, Cmd.none )
 
-        Pick ->
-            ( model, Select.files [ "image/*" ] GotFiles )
-
         DragEnter ->
             ( { model | hover = True }, Cmd.none )
 
         DragLeave ->
             ( { model | hover = False }, Cmd.none )
 
-        -- GotValues v vs ->
-        --     let
-        --         values =
-        --             v :: vs
-        --     in
-        --     ( { model | hover = False }, sendValues values )
-        GotValues2 values ->
+        GotFileValues values ->
             ( { model | hover = False }, sendValues values )
-
-        GotFiles f fs ->
-            let
-                files =
-                    f :: fs
-
-                -- _ =
-                --     log "GotFiles" files
-                -- maxIndex : List ( Int, File ) -> Int
-                -- maxIndex photos =
-                --     List.map Tuple.first photos
-                --         |> List.maximum
-                --         |> Maybe.withDefault 0
-                -- newIndices : List ( Int, File ) -> List Int
-                -- newIndices photos =
-                --     List.range (maxIndex photos + 1) (List.length files - 1)
-                -- newPhotos : List ( Int, File ) -> List ( Int, File )
-                -- newPhotos photos =
-                --     zip (newIndices photos) files
-                -- foo : ( Int, Task.Task x String ) -> Task.Task x ( Int, String )
-                -- foo ( idx, task ) =
-                --     task |> Task.map (Tuple.pair idx)
-                -- _ =
-                --     Debug.log "photos" model.photos
-            in
-            -- ( { model
-            --     | hover = False
-            --     , loading = True
-            -- , files = model.files ++ files
-            -- , photos = log "model.photos" model.photos ++ (newPhotos model.photos |> log "newPhotos")
-            --   }
-            -- , List.map File.toUrl files
-            --     |> Task.sequence
-            --     |> Task.map (Tuple.pair files)
-            --     |> Task.perform GotFilesUrls
-            -- , update (LoadingFiles files) model
-            -- )
-            -- update (LoadingFiles files) { model | hover = False, loading = True }
-            ( { model
-                | hover = False
-                , loading = True
-              }
-            , List.map File.toUrl files
-                |> Task.sequence
-                |> Task.map (Tuple.pair files)
-                |> Task.perform GotFilesUrls
-            )
-
-        -- LoadingFiles files ->
-        --     ( model
-        --     , List.map File.toUrl files
-        --         |> Task.sequence
-        --         |> Task.map (Tuple.pair files)
-        --         |> Task.perform GotFilesUrls
-        --     )
-        GotFilesUrls ( files, urls ) ->
-            -- ( model, sendFiles t )
-            let
-                maxIndex =
-                    map Tuple.first model.photos
-                        |> maxOr 0
-            in
-            ( { model
-                | photos = model.photos ++ zip (List.range (maxIndex + 1) (maxIndex + List.length files)) files
-                , loading = False
-              }
-            , sendFiles ( maxIndex + 1, urls )
-            )
-
-        -- GotPreviews urls ->
-        --     ( { model | previews = model.previews ++ urls }, Cmd.none )
-        DeleteFile n ->
-            ( { model
-                | files = removeAt n model.files
-                , previews = removeAt n model.previews
-              }
-            , Cmd.none
-            )
 
         Rename photo newName ->
             ( { model
-                | textures =
+                | photos =
                     map
                         (\ph ->
                             if ph.id == photo.id then
@@ -462,130 +680,225 @@ update msg model =
                             else
                                 ph
                         )
-                        model.textures
+                        model.photos
               }
             , Cmd.none
             )
 
-        Turn photo ->
+        Turn _ ->
             ( model, Cmd.none )
 
         Delete id ->
-            -- ( { model
-            --     | textures =
-            --         filter (.id >> (/=) id) model.textures
-            --   }
-            -- , Cmd.none
-            -- )
-            case List.head model.textures of
-                Nothing ->
-                    ( model, Cmd.none )
+            ( { model
+                | photos =
+                    filter (.id >> (/=) id) model.photos
+              }
+            , Cmd.none
+            )
 
-                Just photo ->
-                    update (MouseMove photo ( 1, 1 )) { model | textures = filter (.id >> (/=) id) model.textures }
-
-        RecvImage ( file, img ) ->
+        RecvImage ( file, img, ( originalWidth, originalHeight ) ) ->
             let
-                { width, height } =
-                    Canvas.Texture.dimensions img
+                canvConf =
+                    calcCanv
+                        { texture = img
+                        , cropmode = Fit
+                        , printsize = ( 102, 152 )
+                        }
 
-                -- _ =
-                --     log "dims" (Debug.toString ( width, height ))
+                horizontal =
+                    originalWidth > originalHeight
+
                 print =
-                    if width > height then
-                        if width / height > 152 / 102 then
-                            let
-                                w =
-                                    152 * height / 102
+                    { id = 0
+                    , size = ( 102, 152 )
+                    , q = 1
+                    , turn = TurnUp
+                    , cropmode = Fit
+                    , horizontal = horizontal
+                    , canv = canvConf
+                    , xy = ( 0, 0 )
+                    , wh = ( 0.5, 0.5 )
+                    }
 
-                                x =
-                                    (width - w) / (2 * width)
-                            in
-                            Print 1
-                                ( 152, 102 )
-                                { x = x
-                                , y = 0
-                                , w = w / width
-                                , h = 1
-                                }
-                                Fill
-
-                        else
-                            let
-                                h =
-                                    102 * width / 152
-
-                                y =
-                                    (height - h) / (2 * height)
-                            in
-                            Print 1
-                                ( 152, 102 )
-                                { x = 0
-                                , y = y
-                                , w = 1
-                                , h = h / height
-                                }
-                                Fill
-
-                    else if height / width > 152 / 102 then
-                        let
-                            h =
-                                152 * width / 102
-
-                            y =
-                                (height - h) / (2 * height)
-                        in
-                        Print 1
-                            ( 102, 152 )
-                            { x = 0
-                            , y = y
-                            , w = 1
-                            , h = h / height
-                            }
-                            Fill
-
-                    else
-                        let
-                            w =
-                                102 * height / 152
-
-                            x =
-                                (width - w) / (2 * width)
-                        in
-                        Print 1 ( 102, 152 ) { x = x, y = 0, w = w / width, h = 1 } Fill
-
-                -- x = if width/height > 152/102 then
+                photo =
+                    { id = model.photoCount
+                    , texture = img
+                    , size = ( originalWidth, originalHeight )
+                    , horizontal = horizontal
+                    , file = file
+                    , name = File.name file
+                    , cur = Null
+                    , prints = { count = 1, list = [ print ] }
+                    , print = print
+                    }
             in
             ( { model
-                | textureCount = model.textureCount + 1
-                , textures =
-                    model.textures
-                        ++ [ { id = model.textureCount
-                             , texture = img
-                             , crop =
-                                ( print.crop.x * width
-                                , print.crop.y * height
-                                )
-                             , size =
-                                { w = print.crop.w * width
-                                , h = print.crop.h * height
-                                }
-                             , prints = [ print ]
-                             , file = file
-                             , name = File.name file
-                             }
-                           ]
+                | photoCount = model.photoCount + 1
+                , photos =
+                    model.photos
+                        ++ [ photo ]
               }
             , Cmd.none
             )
 
 
-maxOr : comparable -> List comparable -> comparable
-maxOr v list =
-    List.maximum list |> Maybe.withDefault v
 
+{-
+   let
+       { width, height } =
+           Canvas.Texture.dimensions img
 
+       horizontal =
+           width > height
 
+       image_ratio =
+           toFloat originalWidth / toFloat originalHeight
+
+       -- print horizontal image horizontaly
+       -- and vertical image verticaly
+       print_size =
+           iif horizontal ( 152, 102 ) ( 102, 152 )
+
+       print_ratio =
+           first print_size / second print_size
+
+       -- Print id q cropMode printSize cropRect
+       defaultPrint =
+           Print 0 1 Fill print_size
+
+       -- add crop info
+       print =
+           if horizontal then
+               -- image is wider than print
+               -- Fill == Fit print(crop) into image
+               if image_ratio > print_ratio then
+                   -- for Fill max crop box is inside
+                   -- image. crop_h = img.height
+                   -- crop_w = calc
+                   let
+                       -- in pixel
+                       w =
+                           height * print_ratio
+
+                       -- in percent
+                       x =
+                           (width - w) / (2 * width)
+                   in
+                   defaultPrint
+                       { x = x
+                       , y = 0
+                       , w = w / width -- in percent
+                       , h = 1 -- full height
+                       }
+
+               else
+                   -- image is taller than print
+                   -- fit print(crop) into image
+                   -- image is taller than print
+                   let
+                       -- in pixel
+                       h =
+                           width / print_ratio
+
+                       -- in percent
+                       y =
+                           (height - h) / (2 * height)
+                   in
+                   defaultPrint
+                       { x = 0
+                       , y = y
+                       , w = 1 -- full width
+                       , h = h / height -- in percent
+                       }
+
+           else if print_ratio > image_ratio then
+               -- image is vertical
+               -- image is taller than print
+               -- fit print into image
+               -- print width == image width
+               let
+                   -- in pixel
+                   h =
+                       width / print_ratio
+
+                   -- in percent
+                   y =
+                       (height - h) / (2 * height)
+               in
+               defaultPrint
+                   { x = 0
+                   , y = y
+                   , w = 1 -- full width
+                   , h = h / height -- in percent
+                   }
+
+           else
+               -- image is wider than print
+               let
+                   -- in pixel
+                   w =
+                       height * print_ratio
+
+                   -- in percent
+                   x =
+                       (width - w) / (2 * width)
+               in
+               defaultPrint
+                   { x = x
+                   , y = 0
+                   , w = w / width -- in percent
+                   , h = 1 -- full height
+                   }
+   in
+   ( { model
+       | photoCount = model.photoCount + 1
+       , photos =
+           model.photos
+               ++ [ { id = model.photoCount
+                    , texture = img
+                    , crop =
+                       { p =
+                           ( print.crop.x * width
+                           , print.crop.y * height
+                           )
+                       , size =
+                           { w = print.crop.w * width
+                           , h = print.crop.h * height
+                           }
+                       }
+
+                    --  , crop =
+                    --     ( print.crop.x * width
+                    --     , print.crop.y * height
+                    --     )
+                    --  , size =
+                    --     { w = print.crop.w * width
+                    --     , h = print.crop.h * height
+                    --     }
+                    , prints = [ print ]
+                    , file = file
+                    , name = File.name file
+                    , cur = Null
+                    }
+                  ]
+     }
+   , Cmd.none
+   )
+-}
+-- type alias PrintConf =
+--    { mm : PrintSize -- 102 x 152
+--    , mode : CropMode -- Fill / Fit
+--    , orient : Orient -- Port / Album
+--    , croporient : Orient -- Port / Album
+--    ,
+--    }
+-- calc : PrintSize -> CropMode -> CropTurn -> PrintTurn -> ImageSize -> Rect
+--    calc print_size mode crop_turn turn imgage_size =
+--        let
+--            image_aspect = imgage_size.w / imgage_size.h
+--            horizontal = image_aspect > 1
+--            (print_w, print_h) = if horizontal then (print_size.h, print_size.w) else (print_size.w, print_size.h)
+--            print_aspect = print_w / print_h
 --   ####              ####
 --    ####            ####
 --     ####          ####
@@ -602,44 +915,14 @@ maxOr v list =
 
 view : Model -> Html Msg
 view model =
-    div [ class "elm", Mouse.onUp (always MouseUp) ]
-        [ filesList model.files model.previews
-        , div [ class "photos" ] (List.map (photoEditor model.cursor) model.textures ++ [ dropbox model ])
-        , div [ class "dropbox-wrap" ]
-            [ label []
-                [ input
-                    [ type_ "file"
-                    , accept "image/*"
-                    , multiple True
-                    , style "display" "none"
-
-                    -- , hijackOn "change" changeDecoder
-                    -- , on "change" (D.at [ "target", "files" ] (D.list D.value) |> D.map GotValues2)
-                    , on "change" (fileInputDecoder GotValues2)
-                    , value ""
-                    ]
-                    []
-                , div [ class "dropbox-cont" ]
-                    [ text "Choose file" ]
-                ]
-            ]
-        , span [ style "font-weight" "bold" ]
-            [ text
-                (if model.loading then
-                    "LOADING..."
-
-                 else
-                    ""
-                )
-            ]
+    div
+        [ class "elm"
+        , Mouse.onUp (always MouseUp)
         ]
-
-
-
--- filesDecoder : D.Decoder (List Value)
--- filesDecoder =
---     D.at [ "target", "files" ] (D.list D.value)
--- filesToValues : (a -> Msg) -> D.Decoder Msg
+        [ Keyed.node "div"
+            [ class "photos" ]
+            (map photoEditorKeyed model.photos ++ [ dropboxKeyed model ])
+        ]
 
 
 fileInputDecoder : (List D.Value -> value) -> D.Decoder value
@@ -651,8 +934,17 @@ fileInputDecoder msg =
 -- parts
 
 
-photoEditor : Cur -> PhotoData -> Html Msg
-photoEditor cur ({ prints } as photo) =
+photoEditorKeyed : Photo -> ( String, Html Msg )
+photoEditorKeyed photo =
+    ( String.fromInt photo.id, lazy photoEditor photo )
+
+
+photoEditor : Photo -> Html Msg
+photoEditor ({ prints } as photo) =
+    -- let
+    --     id =
+    --         log "draw photo" (String.fromInt photo.id)
+    -- in
     div [ class "photo-editor" ]
         [ input
             [ value photo.name
@@ -660,96 +952,132 @@ photoEditor cur ({ prints } as photo) =
             , onInput (Rename photo)
             ]
             []
-        , div [ class "photo-center" ] [ canvas cur photo ]
+
+        -- THE CANVAS
+        , div [ class "photo-center" ] [ canvas photo ]
+
+        -- BUTTONS
         , div [ class "photo-buttons" ]
             [ button [ onClick (Delete photo.id) ] [ text "delete" ]
+            , text ("№ " ++ String.fromInt (photo.id + 1))
             , button [ onClick (Turn photo) ] [ text "turn" ]
             ]
-        , div [ class "prints" ] (map printCtrl prints)
+
+        -- PRINTS
+        , div [ class "prints" ] (map printCtrl prints.list)
         ]
 
 
-canvas : Cur -> PhotoData -> Html Msg
-canvas cur ({ texture, crop, size } as photo) =
+canvas : Photo -> Html Msg
+canvas ({ texture, print, cur } as photo) =
     let
-        dim =
-            Canvas.Texture.dimensions texture
+        -- dim =
+        --     Canvas.Texture.dimensions texture
+        canv =
+            print.canv
 
         ( crop_x, crop_y ) =
-            crop
+            -- crop.p
+            ( first print.xy * canv.lims.w + canv.lims.x
+            , second print.xy * canv.lims.h + canv.lims.y
+            )
+
+        ( crop_w, crop_h ) =
+            ( first print.wh * canv.lims.w, second print.wh * canv.lims.h )
 
         fog =
-            Canvas.shapes [ Canvas.Settings.fill (Color.rgba 1 1 1 0.65) ]
-                [ Canvas.rect ( 0, 0 ) dim.width crop_y
-                , Canvas.rect ( 0, crop_y ) crop_x size.h
-                , Canvas.rect ( crop_x + size.w, crop_y ) dim.width size.h
-                , Canvas.rect ( 0, crop_y + size.h ) dim.width dim.height
+            Canvas.shapes
+                [ Canvas.Settings.fill (Color.rgba 0.5 0.5 0.5 0.65) ]
+                [ Canvas.rect ( canv.lims.x, canv.lims.y ) canv.lims.w (crop_y - canv.lims.y)
+                , Canvas.rect ( canv.lims.x, crop_y ) (crop_x - canv.lims.x) crop_h
+                , Canvas.rect ( crop_x + crop_w, crop_y ) (canv.lims.w - crop_w - first print.xy * canv.lims.w) crop_h
+                , Canvas.rect
+                    ( canv.lims.x, crop_y + crop_h )
+                    canv.lims.w
+                    (canv.lims.h - crop_h - second print.xy * canv.lims.h)
+                ]
+
+        crop_rect =
+            Canvas.shapes
+                [ Canvas.Settings.stroke (Color.rgb255 108 113 196)
+                ]
+                [ Canvas.rect ( crop_x, crop_y ) crop_w crop_h
                 ]
 
         crop_size_handle =
-            Canvas.shapes [ Canvas.Settings.fill (Color.rgb255 33 150 243) ]
-                [ Canvas.circle (addPoint crop ( size.w, size.h )) 5
+            Canvas.shapes
+                [ Canvas.Settings.fill (Color.rgb255 33 150 243) ]
+                [ Canvas.circle (addPoint ( crop_x, crop_y ) ( crop_w, crop_h )) 5
                 ]
+
+        img =
+            Canvas.texture
+                [ Canvas.Settings.Advanced.transform
+                    [ Canvas.Settings.Advanced.scale canv.scale canv.scale ]
+                ]
+                ( first canv.img / canv.scale
+                , second canv.img / canv.scale
+                )
+                texture
+
+        render =
+            case print.canv.print of
+                Nothing ->
+                    [ Canvas.clear ( 0, 0 ) 276 276
+                    , img
+                    , fog
+                    , crop_rect
+                    , crop_size_handle
+                    ]
+
+                Just pageRect ->
+                    [ Canvas.clear ( 0, 0 ) 276 276
+                    , Canvas.shapes
+                        [ Canvas.Settings.stroke (Color.rgb255 0 0 0)
+                        ]
+                        [ Canvas.rect ( pageRect.x, pageRect.y ) pageRect.w pageRect.h
+                        ]
+                    , img
+                    , fog
+                    , crop_rect
+                    , crop_size_handle
+                    ]
     in
     div
         [ class "photo-padd"
         , Mouse.onMove (.offsetPos >> MouseMove photo)
         , Mouse.onDown (.offsetPos >> MouseDown photo)
         ]
-        [ Canvas.toHtml ( round dim.width, round dim.height )
-            [ class "photo"
-            , style "cursor" (curToStyle cur)
-            ]
-            [ Canvas.texture [] ( 0, 0 ) texture
-            , fog
-            , crop_size_handle
-            ]
+        [ Canvas.toHtml ( 276, 276 )
+            [ class "photo", style "cursor" (curToStyle cur) ]
+            render
         ]
 
 
-printCtrl : Print -> Html Msg
-printCtrl { size, mode, q } =
+printCtrl : Print2 -> Html Msg
+printCtrl { size, cropmode, q } =
     let
-        ( print_x, print_y ) =
+        ( print_width, print_height ) =
             size
     in
     div []
         [ text
-            (String.fromInt q
-                ++ "шт. "
-                ++ " - "
-                ++ String.fromInt print_x
-                ++ "mm x "
-                ++ String.fromInt print_y
-                ++ "mm "
-                ++ (if mode == Fill then
-                        "Без полей"
-
-                    else
-                        "С полями"
-                   )
+            (String.concat
+                [ String.fromInt q
+                , "шт.  - "
+                , String.fromInt print_width
+                , "mm x "
+                , String.fromInt print_height
+                , "mm - "
+                , iif (cropmode == Fill) "Без полей" "С полями"
+                ]
             )
         ]
 
 
-filesList : List File -> List String -> Html Msg
-filesList files previews =
-    let
-        filesAndUrls =
-            zip files previews
-
-        getItem i ( f, p ) =
-            div []
-                [ viewPreview p
-                , text (String.fromInt (i + 1) ++ ". " {- ++ Debug.toString f -})
-                , button [ onClick (DeleteFile i) ] [ text "delete" ]
-                ]
-
-        items =
-            -- List.indexedMap fileToDiv files
-            List.indexedMap getItem filesAndUrls
-    in
-    div [] items
+dropboxKeyed : Model -> ( String, Html Msg )
+dropboxKeyed model =
+    ( "dropbox", lazy dropbox model )
 
 
 dropbox : Model -> Html Msg
@@ -759,36 +1087,34 @@ dropbox model =
          , hijackOn "dragenter" (D.succeed DragEnter)
          , hijackOn "dragover" (D.succeed DragEnter)
          , hijackOn "dragleave" (D.succeed DragLeave)
-
-         --  , hijackOn "drop" dropDecoder2
-         , hijackOn "drop" (dropDecoder GotValues2)
-         , onClick Pick
+         , hijackOn "drop" (dropDecoder GotFileValues)
          ]
             ++ hoverStyle model.hover
         )
-        [ span [ style "color" "#ccc" ] [ text "click to add files or drop them here" ]
+        [ label
+            []
+            [ input
+                [ type_ "file"
+                , accept "image/*"
+                , multiple True
+                , on "change" (fileInputDecoder GotFileValues)
+                , value ""
+                ]
+                []
+            , span
+                [ class "msg" ]
+                [ text "click to add files or drop them here" ]
+            ]
         ]
 
 
 
 -- help funcs
--- dropDecoder : D.Decoder Msg
--- dropDecoder =
---     D.at [ "dataTransfer", "files" ] (D.oneOrMore GotFiles File.decoder)
--- dropDecoder2 : D.Decoder Msg
--- dropDecoder2 =
---     D.at [ "dataTransfer", "files" ] (D.oneOrMore GotValues D.value)
 
 
 dropDecoder : (List Value -> value) -> D.Decoder value
 dropDecoder msg =
     D.at [ "dataTransfer", "files" ] (D.list D.value) |> D.map msg
-
-
-
--- changeDecoder : D.Decoder Msg
--- changeDecoder =
---     D.at [ "target", "files" ] (D.oneOrMore GotValues D.value)
 
 
 hijackOn : String -> D.Decoder msg -> Attribute msg
@@ -812,16 +1138,6 @@ hoverStyle hover =
         []
 
 
-viewPreview : String -> Html msg
-viewPreview url =
-    img
-        [ style "width" "60px"
-        , style "height" "60px"
-        , src url
-        ]
-        []
-
-
 
 --
 --
@@ -836,32 +1152,20 @@ viewPreview url =
 --
 --
 -- UTIL
+-- LOGIC
 
 
-removeAt : Int -> List a -> List a
-removeAt index l =
-    if index < 0 then
-        l
+iif : Bool -> a -> a -> a
+iif bool v x =
+    if bool then
+        v
 
     else
-        let
-            head =
-                List.take index l
-
-            tail =
-                List.drop index l |> List.tail
-        in
-        case tail of
-            Nothing ->
-                l
-
-            Just t ->
-                List.append head t
+        x
 
 
-zip : List a -> List b -> List ( a, b )
-zip a b =
-    List.map2 Tuple.pair a b
+
+-- GEOMETRY
 
 
 inBox : Point -> Point -> Point -> Bool
@@ -886,11 +1190,6 @@ clampPoint { x, y, w, h } ( px, py ) =
     )
 
 
-lim : number -> number -> number -> number
-lim a b v =
-    max a (min v b)
-
-
 dot : Point -> Point -> Float
 dot ( x1, y1 ) ( x2, y2 ) =
     x1 * x2 + y1 * y2
@@ -902,5 +1201,9 @@ mul m ( x, y ) =
 
 
 
--- filesDecoder =
---     D.at [ "target", "files" ] (D.list File.decoder)
+-- MATH
+
+
+lim : number -> number -> number -> number
+lim a b v =
+    max a (min v b)
