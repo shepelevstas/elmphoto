@@ -5468,6 +5468,7 @@ var $author$project$Rect$bottomRight = function (_v0) {
 	var h = _v0.h;
 	return _Utils_Tuple2(x + w, y + h);
 };
+var $author$project$Home$TurnDown = {$: 'TurnDown'};
 var $author$project$Point$delta = F2(
 	function (_v0, _v1) {
 		var ax = _v0.a;
@@ -5491,11 +5492,24 @@ var $author$project$Point$fit = F2(
 			_Utils_Tuple2(src_w * scale, src_h * scale),
 			scale);
 	});
+var $author$project$Point$flip = function (_v0) {
+	var x = _v0.a;
+	var y = _v0.b;
+	return _Utils_Tuple2(y, x);
+};
 var $author$project$Point$fromRect = function (_v0) {
 	var x = _v0.x;
 	var y = _v0.y;
 	return _Utils_Tuple2(x, y);
 };
+var $elm$core$Tuple$mapBoth = F3(
+	function (funcA, funcB, _v0) {
+		var x = _v0.a;
+		var y = _v0.b;
+		return _Utils_Tuple2(
+			funcA(x),
+			funcB(y));
+	});
 var $author$project$Point$mul = F2(
 	function (v, _v0) {
 		var x = _v0.a;
@@ -5523,16 +5537,16 @@ var $author$project$Math$lim = F3(
 			a,
 			A2($elm$core$Basics$min, v, b));
 	});
-var $author$project$Rect$restrict = F2(
-	function (_v0, src) {
+var $author$project$Rect$restrict = F3(
+	function (_v0, src, enlarge) {
 		var x = _v0.x;
 		var y = _v0.y;
 		var w = _v0.w;
 		var h = _v0.h;
-		var scale = A2(
-			$elm$core$Basics$min,
-			1,
-			A2($elm$core$Basics$min, w / src.w, h / src.h));
+		var scale = function () {
+			var scale_ = A2($elm$core$Basics$min, w / src.w, h / src.h);
+			return enlarge ? scale_ : A2($elm$core$Basics$min, 1, scale_);
+		}();
 		var new_w = scale * src.w;
 		var scaled_x = src.x + ((src.w - new_w) / 2);
 		var new_x = A3($author$project$Math$lim, x, (x + w) - new_w, scaled_x);
@@ -5541,10 +5555,6 @@ var $author$project$Rect$restrict = F2(
 		var new_y = A3($author$project$Math$lim, y, (y + h) - new_h, scaled_y);
 		return A4($author$project$Rect$Rect, new_x, new_y, new_w, new_h);
 	});
-var $elm$core$Tuple$second = function (_v0) {
-	var y = _v0.b;
-	return y;
-};
 var $elm$core$Basics$negate = function (n) {
 	return -n;
 };
@@ -5558,29 +5568,20 @@ var $author$project$Point$toRect = F2(
 		var h = _v1.b;
 		return {h: h, w: w, x: x, y: y};
 	});
-var $author$project$Home$calc = F4(
-	function (mode, print_size_mm, img_size, mb_prev_crop) {
-		var lim_size = function () {
-			if (mode.$ === 'Fit') {
-				var _v4 = print_size_mm;
-				var w_ = _v4.a;
-				var h_ = _v4.b;
-				var print_size_mm_ = (_Utils_cmp(img_size.a, img_size.b) > 0) ? _Utils_Tuple2(
-					A2($elm$core$Basics$max, w_, h_),
-					A2($elm$core$Basics$min, w_, h_)) : _Utils_Tuple2(
-					A2($elm$core$Basics$min, w_, h_),
-					A2($elm$core$Basics$max, w_, h_));
-				return A2(
-					$author$project$Point$fit,
-					_Utils_Tuple2(256, 256),
-					print_size_mm_).a;
-			} else {
-				return A2(
-					$author$project$Point$fit,
-					_Utils_Tuple2(256, 256),
-					img_size).a;
-			}
-		}();
+var $author$project$Home$calc = F6(
+	function (mode, print_size_mm, img_size, turn, mb_prev_crop, max_crop) {
+		var img_size_with_turn = (_Utils_eq(turn, $author$project$Home$TurnUp) || _Utils_eq(turn, $author$project$Home$TurnDown)) ? img_size : $author$project$Point$flip(img_size);
+		var _v0 = A3($elm$core$Tuple$mapBoth, $elm$core$Basics$toFloat, $elm$core$Basics$toFloat, print_size_mm);
+		var _short = _v0.a;
+		var _long = _v0.b;
+		var print_size_mm_ = ($author$project$Point$ratio(img_size_with_turn) > 1) ? _Utils_Tuple2(_long, _short) : _Utils_Tuple2(_short, _long);
+		var lim_size = _Utils_eq(mode, $author$project$Home$Fit) ? A2(
+			$author$project$Point$fit,
+			_Utils_Tuple2(256, 256),
+			print_size_mm_).a : A2(
+			$author$project$Point$fit,
+			_Utils_Tuple2(256, 256),
+			img_size_with_turn).a;
 		var lim_P = A2(
 			$author$project$Point$mul,
 			0.5,
@@ -5589,10 +5590,9 @@ var $author$project$Home$calc = F4(
 				lim_size,
 				_Utils_Tuple2(276, 276)));
 		var lim = A2($author$project$Point$toRect, lim_P, lim_size);
-		var crop_ratio = $author$project$Point$ratio(print_size_mm);
-		var _v0 = A2($author$project$Point$fit, lim_size, img_size);
-		var img_size_in_lim = _v0.a;
-		var img_scale = _v0.b;
+		var _v1 = A2($author$project$Point$fit, lim_size, img_size_with_turn);
+		var img_size_in_lim = _v1.a;
+		var img_scale = _v1.b;
 		var img_P = A2(
 			$author$project$Point$add,
 			lim_P,
@@ -5601,9 +5601,9 @@ var $author$project$Home$calc = F4(
 				0.5,
 				A2($author$project$Point$delta, img_size_in_lim, lim_size)));
 		var img = A2($author$project$Point$toRect, img_P, img_size_in_lim);
-		var _v1 = function () {
+		var _v2 = function () {
 			if (mb_prev_crop.$ === 'Nothing') {
-				var crop_size_ = A2($author$project$Point$fit, lim_size, print_size_mm).a;
+				var crop_size_ = A2($author$project$Point$fit, lim_size, print_size_mm_).a;
 				var crop_P_ = A2(
 					$author$project$Point$add,
 					lim_P,
@@ -5615,15 +5615,16 @@ var $author$project$Home$calc = F4(
 				return _Utils_Tuple3(crop_, crop_P_, crop_size_);
 			} else {
 				var prev_crop = mb_prev_crop.a;
-				var crop_ = A2($author$project$Rect$restrict, lim, prev_crop);
+				var crop_ = A3($author$project$Rect$restrict, lim, prev_crop, max_crop);
 				var crop_P_ = $author$project$Point$fromRect(crop_);
 				var crop_size_ = $author$project$Point$rectSize(crop_);
 				return _Utils_Tuple3(crop_, crop_P_, crop_size_);
 			}
 		}();
-		var crop = _v1.a;
-		var crop_P = _v1.b;
-		var crop_size = _v1.c;
+		var crop = _v2.a;
+		var crop_P = _v2.b;
+		var crop_size = _v2.c;
+		var crop_ratio = $author$project$Point$ratio(crop_size);
 		var sz_P = A2(
 			$author$project$Point$add,
 			$author$project$Home$size_handle_offset,
@@ -5650,15 +5651,6 @@ var $elm$core$Basics$composeR = F3(
 	});
 var $author$project$Home$default_cropmode = $author$project$Home$Fill;
 var $author$project$Home$default_printSize_mm = _Utils_Tuple2(102, 152);
-var $joakin$elm_canvas$Canvas$Texture$dimensions = function (texture) {
-	if (texture.$ === 'TImage') {
-		var image = texture.a;
-		return {height: image.height, width: image.width};
-	} else {
-		var data = texture.a;
-		return {height: data.height, width: data.width};
-	}
-};
 var $elm$core$List$filter = F2(
 	function (isGood, list) {
 		return A3(
@@ -5670,11 +5662,6 @@ var $elm$core$List$filter = F2(
 			_List_Nil,
 			list);
 	});
-var $author$project$Point$flip = function (_v0) {
-	var x = _v0.a;
-	var y = _v0.b;
-	return _Utils_Tuple2(y, x);
-};
 var $elm$core$Basics$not = _Basics_not;
 var $author$project$Point$hits = F2(
 	function (_v0, _v1) {
@@ -5686,6 +5673,19 @@ var $author$project$Point$hits = F2(
 		var py = _v1.b;
 		return !((_Utils_cmp(px, x) < 0) || ((_Utils_cmp(py, y) < 0) || ((_Utils_cmp(px, x + w) > 0) || (_Utils_cmp(py, y + h) > 0))));
 	});
+var $joakin$elm_canvas$Canvas$Texture$dimensions = function (texture) {
+	if (texture.$ === 'TImage') {
+		var image = texture.a;
+		return {height: image.height, width: image.width};
+	} else {
+		var data = texture.a;
+		return {height: data.height, width: data.width};
+	}
+};
+var $author$project$Home$imageSize = function (tex) {
+	var dim = $joakin$elm_canvas$Canvas$Texture$dimensions(tex);
+	return _Utils_Tuple2(dim.width, dim.height);
+};
 var $author$project$Point$isLeftTurn = F2(
 	function (_v0, _v1) {
 		var ax = _v0.a;
@@ -5700,17 +5700,9 @@ var $author$project$Point$left = F2(
 		var bx = b.a;
 		return (_Utils_cmp(ax, bx) < 0) ? a : b;
 	});
-var $elm$core$Tuple$mapBoth = F3(
-	function (funcA, funcB, _v0) {
-		var x = _v0.a;
-		var y = _v0.b;
-		return _Utils_Tuple2(
-			funcA(x),
-			funcB(y));
-	});
+var $elm$core$Debug$log = _Debug_log;
 var $elm$file$File$name = _File_name;
 var $elm$core$Basics$neq = _Utils_notEqual;
-var $author$project$Home$TurnDown = {$: 'TurnDown'};
 var $author$project$Home$TurnLeft = {$: 'TurnLeft'};
 var $author$project$Home$TurnRight = {$: 'TurnRight'};
 var $author$project$Home$nextTurn = function (turn) {
@@ -5789,11 +5781,9 @@ var $author$project$Home$update = F2(
 					var _v3 = $author$project$Point$pointSize(print.crop);
 					var crop_P = _v3.a;
 					var crop_size = _v3.b;
-					var crop_w = crop_size.a;
-					var crop_h = crop_size.b;
-					var crop_p = A2($author$project$Point$delta, lim_P, crop_P);
-					var crop_x = crop_p.a;
-					var crop_y = crop_p.b;
+					var _v4 = A2($author$project$Point$delta, lim_P, crop_P);
+					var crop_x = _v4.a;
+					var crop_y = _v4.b;
 					var diag_x_right = function () {
 						var x_ = lim_w - crop_x;
 						return _Utils_Tuple2(x_, x_ / print.cropratio);
@@ -5824,16 +5814,12 @@ var $author$project$Home$update = F2(
 						$elm$core$Platform$Cmd$none);
 				} else {
 					if (A2($author$project$Point$hits, print.crop, p)) {
-						var _v4 = $author$project$Point$pointSize(print.lim);
-						var lim_P = _v4.a;
-						var lim_size = _v4.b;
-						var lim_w = lim_size.a;
-						var lim_h = lim_size.b;
-						var _v5 = $author$project$Point$pointSize(print.crop);
-						var crop_P = _v5.a;
-						var crop_size = _v5.b;
-						var crop_w = crop_size.a;
-						var crop_h = crop_size.b;
+						var _v5 = $author$project$Point$pointSize(print.lim);
+						var lim_P = _v5.a;
+						var lim_size = _v5.b;
+						var _v6 = $author$project$Point$pointSize(print.crop);
+						var crop_P = _v6.a;
+						var crop_size = _v6.b;
 						var delta_with_crop_P = $author$project$Point$delta(
 							A2($author$project$Point$delta, crop_P, p));
 						var clamp = $author$project$Point$clamp(
@@ -5856,8 +5842,8 @@ var $author$project$Home$update = F2(
 				var print = msg.a.print;
 				var id = msg.a.id;
 				var p = msg.b;
-				var _v6 = model.dragging;
-				switch (_v6.$) {
+				var _v7 = model.dragging;
+				switch (_v7.$) {
 					case 'DragNone':
 						var cur = A2($author$project$Point$hits, print.sz, p) ? $author$project$Home$Cross : (A2($author$project$Point$hits, print.crop, p) ? $author$project$Home$Move : $author$project$Home$Null);
 						var update_photo = function (ph) {
@@ -5873,8 +5859,8 @@ var $author$project$Home$update = F2(
 								}),
 							$elm$core$Platform$Cmd$none);
 					case 'DragMove':
-						var curPhoto = _v6.a;
-						var xy = _v6.b;
+						var curPhoto = _v7.a;
+						var xy = _v7.b;
 						if (_Utils_eq(curPhoto.id, id)) {
 							var crop_size = $author$project$Point$rectSize(print.crop);
 							var crop_P = xy(p);
@@ -5904,8 +5890,8 @@ var $author$project$Home$update = F2(
 							return _Utils_Tuple2(model, $elm$core$Platform$Cmd$none);
 						}
 					default:
-						var curPhoto = _v6.a;
-						var wh = _v6.b;
+						var curPhoto = _v7.a;
+						var wh = _v7.b;
 						if (_Utils_eq(curPhoto.id, id)) {
 							var curPrint = curPhoto.print;
 							var crop_size = wh(p);
@@ -5982,11 +5968,29 @@ var $author$project$Home$update = F2(
 				var photo = msg.a;
 				var print = photo.print;
 				var id = photo.id;
+				var turn = $author$project$Home$nextTurn(print.turn);
+				var img_size = $author$project$Home$imageSize(photo.texture);
+				var _v8 = A6(
+					$author$project$Home$calc,
+					print.cropmode,
+					print.size,
+					img_size,
+					turn,
+					$elm$core$Maybe$Just(print.crop),
+					_Utils_eq(
+						$elm$core$Basics$floor(print.crop.w),
+						$elm$core$Basics$floor(print.lim.w)) || _Utils_eq(
+						$elm$core$Basics$floor(print.crop.h),
+						$elm$core$Basics$floor(print.lim.h)));
+				var cropratio = _v8.cropratio;
+				var imgscale = _v8.imgscale;
+				var lim = _v8.lim;
+				var img = _v8.img;
+				var crop = _v8.crop;
+				var sz = _v8.sz;
 				var new_print = _Utils_update(
 					print,
-					{
-						turn: $author$project$Home$nextTurn(print.turn)
-					});
+					{crop: crop, cropratio: cropratio, img: img, imgscale: imgscale, lim: lim, sz: sz, turn: turn});
 				var new_photo = _Utils_update(
 					photo,
 					{print: new_print});
@@ -6004,11 +6008,29 @@ var $author$project$Home$update = F2(
 				var photo = msg.a;
 				var print = photo.print;
 				var id = photo.id;
+				var turn = $author$project$Home$prevTurn(print.turn);
+				var img_size = $author$project$Home$imageSize(photo.texture);
+				var _v9 = A6(
+					$author$project$Home$calc,
+					print.cropmode,
+					print.size,
+					img_size,
+					turn,
+					$elm$core$Maybe$Just(print.crop),
+					_Utils_eq(
+						$elm$core$Basics$floor(print.crop.w),
+						$elm$core$Basics$floor(print.lim.w)) || _Utils_eq(
+						$elm$core$Basics$floor(print.crop.h),
+						$elm$core$Basics$floor(print.lim.h)));
+				var cropratio = _v9.cropratio;
+				var imgscale = _v9.imgscale;
+				var lim = _v9.lim;
+				var img = _v9.img;
+				var crop = _v9.crop;
+				var sz = _v9.sz;
 				var new_print = _Utils_update(
 					print,
-					{
-						turn: $author$project$Home$prevTurn(print.turn)
-					});
+					{crop: crop, cropratio: cropratio, img: img, imgscale: imgscale, lim: lim, sz: sz, turn: turn});
 				var new_photo = _Utils_update(
 					photo,
 					{print: new_print});
@@ -6025,30 +6047,29 @@ var $author$project$Home$update = F2(
 			case 'ToggleCropMode':
 				var photo = msg.a;
 				var print = photo.print;
-				var print_size_mm = print.horizontal ? $author$project$Point$flip(
-					A3($elm$core$Tuple$mapBoth, $elm$core$Basics$toFloat, $elm$core$Basics$toFloat, print.size)) : A3($elm$core$Tuple$mapBoth, $elm$core$Basics$toFloat, $elm$core$Basics$toFloat, print.size);
-				var dim = $joakin$elm_canvas$Canvas$Texture$dimensions(photo.texture);
-				var img_size = _Utils_Tuple2(dim.width, dim.height);
-				var cropmode = function () {
-					var _v8 = print.cropmode;
-					if (_v8.$ === 'Fit') {
-						return $author$project$Home$Fill;
-					} else {
-						return $author$project$Home$Fit;
-					}
+				var max_crop = function () {
+					var lim_w_ = $elm$core$Basics$floor(print.lim.w);
+					var lim_h_ = $elm$core$Basics$floor(print.lim.h);
+					var crop_w_ = $elm$core$Basics$floor(print.crop.w);
+					var crop_h_ = $elm$core$Basics$floor(print.crop.h);
+					return _Utils_eq(crop_w_, lim_w_) || _Utils_eq(crop_h_, lim_h_);
 				}();
-				var _v7 = A4(
+				var img_size = $author$project$Home$imageSize(photo.texture);
+				var cropmode = _Utils_eq(print.cropmode, $author$project$Home$Fit) ? $author$project$Home$Fill : $author$project$Home$Fit;
+				var _v10 = A6(
 					$author$project$Home$calc,
 					cropmode,
-					print_size_mm,
+					print.size,
 					img_size,
-					$elm$core$Maybe$Just(print.crop));
-				var cropratio = _v7.cropratio;
-				var imgscale = _v7.imgscale;
-				var lim = _v7.lim;
-				var img = _v7.img;
-				var crop = _v7.crop;
-				var sz = _v7.sz;
+					print.turn,
+					$elm$core$Maybe$Just(print.crop),
+					max_crop);
+				var cropratio = _v10.cropratio;
+				var imgscale = _v10.imgscale;
+				var lim = _v10.lim;
+				var img = _v10.img;
+				var crop = _v10.crop;
+				var sz = _v10.sz;
 				var new_print = _Utils_update(
 					print,
 					{crop: crop, cropmode: cropmode, cropratio: cropratio, img: img, imgscale: imgscale, lim: lim, sz: sz});
@@ -6058,6 +6079,8 @@ var $author$project$Home$update = F2(
 				var update_photo = function (ph) {
 					return _Utils_eq(ph.id, photo.id) ? new_photo : ph;
 				};
+				var _v11 = A2($elm$core$Debug$log, 'print.crop', print.crop);
+				var _v12 = A2($elm$core$Debug$log, 'print.lim', print.lim);
 				return _Utils_Tuple2(
 					_Utils_update(
 						model,
@@ -6073,10 +6096,11 @@ var $author$project$Home$update = F2(
 					$author$project$Point$flip(
 						A3($elm$core$Tuple$mapBoth, $elm$core$Basics$toFloat, $elm$core$Basics$toFloat, print.size))) : $author$project$Point$ratio(
 					A3($elm$core$Tuple$mapBoth, $elm$core$Basics$toFloat, $elm$core$Basics$toFloat, print.size));
-				var crop = A2(
+				var crop = A3(
 					$author$project$Rect$restrict,
 					print.lim,
-					$author$project$Rect$turn(print.crop));
+					$author$project$Rect$turn(print.crop),
+					false);
 				var bottomRight = $author$project$Rect$bottomRight(crop);
 				var sz = A2(
 					$author$project$Point$toRect,
@@ -6116,24 +6140,21 @@ var $author$project$Home$update = F2(
 						}),
 					$elm$core$Platform$Cmd$none);
 			default:
-				var _v9 = msg.a;
-				var file = _v9.a;
-				var image = _v9.b;
-				var _v10 = _v9.c;
-				var originalWidth = _v10.a;
-				var originalHeight = _v10.b;
+				var _v13 = msg.a;
+				var file = _v13.a;
+				var image = _v13.b;
+				var _v14 = _v13.c;
+				var originalWidth = _v14.a;
+				var originalHeight = _v14.b;
+				var img_size = $author$project$Home$imageSize(image);
 				var horizontal = _Utils_cmp(originalWidth, originalHeight) > 0;
-				var print_size_mm = horizontal ? $author$project$Point$flip(
-					A3($elm$core$Tuple$mapBoth, $elm$core$Basics$toFloat, $elm$core$Basics$toFloat, $author$project$Home$default_printSize_mm)) : A3($elm$core$Tuple$mapBoth, $elm$core$Basics$toFloat, $elm$core$Basics$toFloat, $author$project$Home$default_printSize_mm);
-				var dim = $joakin$elm_canvas$Canvas$Texture$dimensions(image);
-				var img_size = _Utils_Tuple2(dim.width, dim.height);
-				var _v11 = A4($author$project$Home$calc, $author$project$Home$default_cropmode, print_size_mm, img_size, $elm$core$Maybe$Nothing);
-				var cropratio = _v11.cropratio;
-				var imgscale = _v11.imgscale;
-				var lim = _v11.lim;
-				var img = _v11.img;
-				var crop = _v11.crop;
-				var sz = _v11.sz;
+				var _v15 = A6($author$project$Home$calc, $author$project$Home$default_cropmode, $author$project$Home$default_printSize_mm, img_size, $author$project$Home$TurnUp, $elm$core$Maybe$Nothing, true);
+				var cropratio = _v15.cropratio;
+				var imgscale = _v15.imgscale;
+				var lim = _v15.lim;
+				var img = _v15.img;
+				var crop = _v15.crop;
+				var sz = _v15.sz;
 				var print = {crop: crop, cropmode: $author$project$Home$default_cropmode, cropratio: cropratio, horizontal: horizontal, id: 0, img: img, imgscale: imgscale, lim: lim, q: 1, size: $author$project$Home$default_printSize_mm, sz: sz, turn: $author$project$Home$TurnUp};
 				var photo = {
 					cur: $author$project$Home$Null,
@@ -6480,23 +6501,6 @@ var $joakin$elm_canvas$Canvas$circle = F2(
 	function (pos, radius) {
 		return A2($joakin$elm_canvas$Canvas$Internal$Canvas$Circle, pos, radius);
 	});
-var $joakin$elm_canvas$Canvas$Internal$Canvas$DrawableClear = F3(
-	function (a, b, c) {
-		return {$: 'DrawableClear', a: a, b: b, c: c};
-	});
-var $joakin$elm_canvas$Canvas$Internal$Canvas$NotSpecified = {$: 'NotSpecified'};
-var $joakin$elm_canvas$Canvas$Renderable = function (a) {
-	return {$: 'Renderable', a: a};
-};
-var $joakin$elm_canvas$Canvas$clear = F3(
-	function (point, w, h) {
-		return $joakin$elm_canvas$Canvas$Renderable(
-			{
-				commands: _List_Nil,
-				drawOp: $joakin$elm_canvas$Canvas$Internal$Canvas$NotSpecified,
-				drawable: A3($joakin$elm_canvas$Canvas$Internal$Canvas$DrawableClear, point, w, h)
-			});
-	});
 var $author$project$Home$curStyle = function (cur) {
 	var val = function () {
 		switch (cur.$) {
@@ -6524,6 +6528,47 @@ var $joakin$elm_canvas$Canvas$Settings$fill = function (color) {
 	return $joakin$elm_canvas$Canvas$Internal$Canvas$SettingDrawOp(
 		$joakin$elm_canvas$Canvas$Internal$Canvas$Fill(color));
 };
+var $joakin$elm_canvas$Canvas$Internal$Canvas$SettingCommand = function (a) {
+	return {$: 'SettingCommand', a: a};
+};
+var $elm$json$Json$Encode$object = function (pairs) {
+	return _Json_wrap(
+		A3(
+			$elm$core$List$foldl,
+			F2(
+				function (_v0, obj) {
+					var k = _v0.a;
+					var v = _v0.b;
+					return A3(_Json_addField, k, v, obj);
+				}),
+			_Json_emptyObject(_Utils_Tuple0),
+			pairs));
+};
+var $joakin$elm_canvas$Canvas$Internal$CustomElementJsonApi$field = F2(
+	function (name, value) {
+		return $elm$json$Json$Encode$object(
+			_List_fromArray(
+				[
+					_Utils_Tuple2(
+					'type',
+					$elm$json$Json$Encode$string('field')),
+					_Utils_Tuple2(
+					'name',
+					$elm$json$Json$Encode$string(name)),
+					_Utils_Tuple2('value', value)
+				]));
+	});
+var $elm$json$Json$Encode$float = _Json_wrap;
+var $joakin$elm_canvas$Canvas$Internal$CustomElementJsonApi$lineWidth = function (value) {
+	return A2(
+		$joakin$elm_canvas$Canvas$Internal$CustomElementJsonApi$field,
+		'lineWidth',
+		$elm$json$Json$Encode$float(value));
+};
+var $joakin$elm_canvas$Canvas$Settings$Line$lineWidth = function (width) {
+	return $joakin$elm_canvas$Canvas$Internal$Canvas$SettingCommand(
+		$joakin$elm_canvas$Canvas$Internal$CustomElementJsonApi$lineWidth(width));
+};
 var $mpizenberg$elm_pointer_events$Html$Events$Extra$Mouse$onDown = A2($mpizenberg$elm_pointer_events$Html$Events$Extra$Mouse$onWithOptions, 'mousedown', $mpizenberg$elm_pointer_events$Html$Events$Extra$Mouse$defaultOptions);
 var $mpizenberg$elm_pointer_events$Html$Events$Extra$Mouse$onMove = A2($mpizenberg$elm_pointer_events$Html$Events$Extra$Mouse$onWithOptions, 'mousemove', $mpizenberg$elm_pointer_events$Html$Events$Extra$Mouse$defaultOptions);
 var $joakin$elm_canvas$Canvas$Internal$Canvas$Rect = F3(
@@ -6533,6 +6578,10 @@ var $joakin$elm_canvas$Canvas$Internal$Canvas$Rect = F3(
 var $joakin$elm_canvas$Canvas$rect = F3(
 	function (pos, width, height) {
 		return A3($joakin$elm_canvas$Canvas$Internal$Canvas$Rect, pos, width, height);
+	});
+var $avh4$elm_color$Color$rgb = F3(
+	function (r, g, b) {
+		return A4($avh4$elm_color$Color$RgbaSpace, r, g, b, 1.0);
 	});
 var $avh4$elm_color$Color$scaleFrom255 = function (c) {
 	return c / 255;
@@ -6561,6 +6610,10 @@ var $joakin$elm_canvas$Canvas$Settings$Advanced$Scale = F2(
 var $joakin$elm_canvas$Canvas$Settings$Advanced$scale = $joakin$elm_canvas$Canvas$Settings$Advanced$Scale;
 var $joakin$elm_canvas$Canvas$Internal$Canvas$DrawableShapes = function (a) {
 	return {$: 'DrawableShapes', a: a};
+};
+var $joakin$elm_canvas$Canvas$Internal$Canvas$NotSpecified = {$: 'NotSpecified'};
+var $joakin$elm_canvas$Canvas$Renderable = function (a) {
+	return {$: 'Renderable', a: a};
 };
 var $joakin$elm_canvas$Canvas$Internal$Canvas$FillAndStroke = F2(
 	function (a, b) {
@@ -6726,19 +6779,6 @@ var $elm$html$Html$Attributes$height = function (n) {
 		$elm$core$String$fromInt(n));
 };
 var $joakin$elm_canvas$Canvas$Internal$CustomElementJsonApi$empty = _List_Nil;
-var $elm$json$Json$Encode$object = function (pairs) {
-	return _Json_wrap(
-		A3(
-			$elm$core$List$foldl,
-			F2(
-				function (_v0, obj) {
-					var k = _v0.a;
-					var v = _v0.b;
-					return A3(_Json_addField, k, v, obj);
-				}),
-			_Json_emptyObject(_Utils_Tuple0),
-			pairs));
-};
 var $joakin$elm_canvas$Canvas$Internal$CustomElementJsonApi$fn = F2(
 	function (name, args) {
 		return $elm$json$Json$Encode$object(
@@ -6756,7 +6796,6 @@ var $joakin$elm_canvas$Canvas$Internal$CustomElementJsonApi$fn = F2(
 				]));
 	});
 var $joakin$elm_canvas$Canvas$Internal$CustomElementJsonApi$beginPath = A2($joakin$elm_canvas$Canvas$Internal$CustomElementJsonApi$fn, 'beginPath', _List_Nil);
-var $elm$json$Json$Encode$float = _Json_wrap;
 var $joakin$elm_canvas$Canvas$Internal$CustomElementJsonApi$clearRect = F4(
 	function (x, y, width, height) {
 		return A2(
@@ -7020,20 +7059,6 @@ var $joakin$elm_canvas$Canvas$Internal$CustomElementJsonApi$fill = function (fil
 				$joakin$elm_canvas$Canvas$Internal$CustomElementJsonApi$fillRuleToString(fillRule))
 			]));
 };
-var $joakin$elm_canvas$Canvas$Internal$CustomElementJsonApi$field = F2(
-	function (name, value) {
-		return $elm$json$Json$Encode$object(
-			_List_fromArray(
-				[
-					_Utils_Tuple2(
-					'type',
-					$elm$json$Json$Encode$string('field')),
-					_Utils_Tuple2(
-					'name',
-					$elm$json$Json$Encode$string(name)),
-					_Utils_Tuple2('value', value)
-				]));
-	});
 var $elm$core$String$concat = function (strings) {
 	return A2($elm$core$String$join, '', strings);
 };
@@ -7474,12 +7499,28 @@ var $joakin$elm_canvas$Canvas$Settings$Advanced$Translate = F2(
 		return {$: 'Translate', a: a, b: b};
 	});
 var $joakin$elm_canvas$Canvas$Settings$Advanced$translate = $joakin$elm_canvas$Canvas$Settings$Advanced$Translate;
+var $avh4$elm_color$Color$white = A4($avh4$elm_color$Color$RgbaSpace, 255 / 255, 255 / 255, 255 / 255, 1.0);
 var $author$project$Home$canvas = function (photo) {
 	var texture = photo.texture;
 	var print = photo.print;
 	var cur = photo.cur;
 	var img_P = $author$project$Point$fromRect(print.img);
 	var dim = $joakin$elm_canvas$Canvas$Texture$dimensions(photo.texture);
+	var clear = A2(
+		$joakin$elm_canvas$Canvas$shapes,
+		_List_fromArray(
+			[
+				$joakin$elm_canvas$Canvas$Settings$fill(
+				A3($avh4$elm_color$Color$rgb, 0.75, 0.75, 0.75))
+			]),
+		_List_fromArray(
+			[
+				A3(
+				$joakin$elm_canvas$Canvas$rect,
+				_Utils_Tuple2(0, 0),
+				276,
+				276)
+			]));
 	var _v0 = $author$project$Point$pointSize(print.lim);
 	var lim_P = _v0.a;
 	var _v1 = _v0.b;
@@ -7489,7 +7530,18 @@ var $author$project$Home$canvas = function (photo) {
 		$joakin$elm_canvas$Canvas$shapes,
 		_List_fromArray(
 			[
-				$joakin$elm_canvas$Canvas$Settings$stroke($avh4$elm_color$Color$black)
+				$joakin$elm_canvas$Canvas$Settings$stroke($avh4$elm_color$Color$black),
+				$joakin$elm_canvas$Canvas$Settings$Line$lineWidth(0.25)
+			]),
+		_List_fromArray(
+			[
+				A3($joakin$elm_canvas$Canvas$rect, lim_P, lim_w, lim_h)
+			]));
+	var page = A2(
+		$joakin$elm_canvas$Canvas$shapes,
+		_List_fromArray(
+			[
+				$joakin$elm_canvas$Canvas$Settings$fill($avh4$elm_color$Color$white)
 			]),
 		_List_fromArray(
 			[
@@ -7500,20 +7552,20 @@ var $author$project$Home$canvas = function (photo) {
 		switch (_v3.$) {
 			case 'TurnUp':
 				return _Utils_Tuple2(
-					$elm$core$Basics$degrees(10),
+					$elm$core$Basics$degrees(0),
 					_Utils_Tuple2(0, 0));
 			case 'TurnRight':
 				return _Utils_Tuple2(
 					$elm$core$Basics$degrees(90),
-					_Utils_Tuple2(print.imgscale * dim.height, 0));
+					_Utils_Tuple2(dim.height, 0));
 			case 'TurnDown':
 				return _Utils_Tuple2(
 					$elm$core$Basics$degrees(180),
-					_Utils_Tuple2(print.imgscale * dim.width, print.imgscale * dim.height));
+					_Utils_Tuple2(dim.width, dim.height));
 			default:
 				return _Utils_Tuple2(
 					$elm$core$Basics$degrees(-90),
-					_Utils_Tuple2(0, print.imgscale * dim.width));
+					_Utils_Tuple2(0, dim.width));
 		}
 	}();
 	var rotation = _v2.a;
@@ -7528,8 +7580,8 @@ var $author$project$Home$canvas = function (photo) {
 				$joakin$elm_canvas$Canvas$Settings$Advanced$transform(
 				_List_fromArray(
 					[
-						$joakin$elm_canvas$Canvas$Settings$Advanced$rotate(rotation),
 						A2($joakin$elm_canvas$Canvas$Settings$Advanced$translate, trans_x, trans_y),
+						$joakin$elm_canvas$Canvas$Settings$Advanced$rotate(rotation),
 						A2($joakin$elm_canvas$Canvas$Settings$Advanced$scale, print.imgscale, print.imgscale)
 					]))
 			]),
@@ -7589,23 +7641,12 @@ var $author$project$Home$canvas = function (photo) {
 		_List_fromArray(
 			[
 				$joakin$elm_canvas$Canvas$Settings$fill(
-				A4($avh4$elm_color$Color$rgba, 1, 1, 1, 0.65))
+				A4($avh4$elm_color$Color$rgba, 1, 0.2, 0.2, 0.5))
 			]),
 		_List_fromArray(
 			[fog_top, fog_left, fog_right, fog_bottom]));
 	var render = _List_fromArray(
-		[
-			A3(
-			$joakin$elm_canvas$Canvas$clear,
-			_Utils_Tuple2(0, 0),
-			276,
-			276),
-			img,
-			fog,
-			lim_border,
-			crop_rect,
-			crop_size_handle
-		]);
+		[clear, page, img, fog, lim_border, crop_rect, crop_size_handle]);
 	return A2(
 		$elm$html$Html$div,
 		_List_fromArray(

@@ -23,11 +23,19 @@ height { h } =
     h
 
 
-restrict : Rect -> Rect -> Rect
-restrict { x, y, w, h } src =
+restrict : Rect -> Rect -> Bool -> Rect
+restrict { x, y, w, h } src enlarge =
     let
         scale =
-            min 1 (min (w / src.w) (h / src.h))
+            let
+                scale_ =
+                    min (w / src.w) (h / src.h)
+            in
+            if enlarge then
+                scale_
+
+            else
+                min 1 scale_
 
         new_w =
             scale * src.w

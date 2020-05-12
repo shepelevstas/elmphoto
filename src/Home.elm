@@ -2,11 +2,13 @@ port module Home exposing (main)
 
 -- import List.Extra exposing (find)
 -- import File.Select as Select
+-- import Math as M exposing (lim)
 
 import Browser
 import Canvas
 import Canvas.Settings
 import Canvas.Settings.Advanced
+import Canvas.Settings.Line
 import Canvas.Texture exposing (Texture, fromDomImage)
 import Color
 import Debug exposing (log)
@@ -19,10 +21,9 @@ import Html.Keyed as Keyed
 import Html.Lazy exposing (lazy)
 import Json.Decode as D exposing (Value)
 import List exposing (filter, map)
-import Math as M exposing (lim)
 import Point as P exposing (Point)
 import Rect as R exposing (Rect)
-import Tuple exposing (first, second)
+import Tuple exposing (first)
 
 
 size_handle_offset : Point
@@ -81,8 +82,8 @@ type alias Print =
     }
 
 
-calc : CropMode -> Point -> Point -> Maybe Rect -> { cropratio : Float, lim : Rect, img : Rect, imgscale : Float, crop : Rect, sz : Rect }
-calc mode print_size_mm img_size mb_prev_crop =
+calc : CropMode -> PrintSize -> Point -> Turn -> Maybe Rect -> Bool -> { cropratio : Float, lim : Rect, img : Rect, imgscale : Float, crop : Rect, sz : Rect }
+calc mode print_size_mm img_size turn mb_prev_crop max_crop =
     let
         lim =
             P.toRect lim_P lim_size
@@ -90,24 +91,22 @@ calc mode print_size_mm img_size mb_prev_crop =
         lim_P =
             P.mul 0.5 (P.delta lim_size ( 276, 276 ))
 
+        ( short, long ) =
+            Tuple.mapBoth toFloat toFloat print_size_mm
+
+        print_size_mm_ =
+            if P.ratio img_size_with_turn > 1 then
+                ( long, short )
+
+            else
+                ( short, long )
+
         lim_size =
-            case mode of
-                Fit ->
-                    let
-                        ( w_, h_ ) =
-                            print_size_mm
+            if mode == Fit then
+                P.fit ( 256, 256 ) print_size_mm_ |> first
 
-                        print_size_mm_ =
-                            if first img_size > second img_size then
-                                ( max w_ h_, min w_ h_ )
-
-                            else
-                                ( min w_ h_, max w_ h_ )
-                    in
-                    P.fit ( 256, 256 ) print_size_mm_ |> first
-
-                Fill ->
-                    P.fit ( 256, 256 ) img_size |> first
+            else
+                P.fit ( 256, 256 ) img_size_with_turn |> first
 
         img =
             P.toRect img_P img_size_in_lim
@@ -116,14 +115,21 @@ calc mode print_size_mm img_size mb_prev_crop =
             P.mul 0.5 (P.delta img_size_in_lim lim_size) |> P.add lim_P
 
         ( img_size_in_lim, img_scale ) =
-            P.fit lim_size img_size
+            P.fit lim_size img_size_with_turn
+
+        img_size_with_turn =
+            if turn == TurnUp || turn == TurnDown then
+                img_size
+
+            else
+                P.flip img_size
 
         ( crop, crop_P, crop_size ) =
             case mb_prev_crop of
                 Nothing ->
                     let
                         crop_size_ =
-                            P.fit lim_size print_size_mm |> first
+                            P.fit lim_size print_size_mm_ |> first
 
                         crop_P_ =
                             P.mul 0.5 (P.delta crop_size_ lim_size) |> P.add lim_P
@@ -136,7 +142,7 @@ calc mode print_size_mm img_size mb_prev_crop =
                 Just prev_crop ->
                     let
                         crop_ =
-                            R.restrict lim prev_crop
+                            R.restrict lim prev_crop max_crop
 
                         crop_P_ =
                             P.fromRect crop_
@@ -147,7 +153,7 @@ calc mode print_size_mm img_size mb_prev_crop =
                     ( crop_, crop_P_, crop_size_ )
 
         crop_ratio =
-            P.ratio print_size_mm
+            P.ratio crop_size
 
         sz =
             P.toRect sz_P size_handle_size
@@ -329,13 +335,13 @@ update msg model =
                         else
                             ( y_ * print.cropratio, y_ )
 
-                    ( crop_P, ( crop_w, crop_h ) as crop_size ) =
+                    ( crop_P, crop_size ) =
                         P.pointSize print.crop
 
                     ( lim_P, ( lim_w, lim_h ) ) =
                         P.pointSize print.lim
 
-                    (( crop_x, crop_y ) as crop_p) =
+                    ( crop_x, crop_y ) =
                         P.delta lim_P crop_P
 
                     diag_x_right =
@@ -365,10 +371,10 @@ update msg model =
 
             else if P.hits print.crop p then
                 let
-                    ( crop_P, ( crop_w, crop_h ) as crop_size ) =
+                    ( crop_P, crop_size ) =
                         P.pointSize print.crop
 
-                    ( lim_P, ( lim_w, lim_h ) as lim_size ) =
+                    ( lim_P, lim_size ) =
                         P.pointSize print.lim
 
                     -- return new crop_P from new mouse point
@@ -524,8 +530,25 @@ update msg model =
 
         TurnNext ({ print, id } as photo) ->
             let
+                { cropratio, imgscale, lim, img, crop, sz } =
+                    calc print.cropmode print.size img_size turn (Just print.crop) (floor print.crop.w == floor print.lim.w || floor print.crop.h == floor print.lim.h)
+
+                turn =
+                    nextTurn print.turn
+
+                img_size =
+                    imageSize photo.texture
+
                 new_print =
-                    { print | turn = nextTurn print.turn }
+                    { print
+                        | turn = turn
+                        , cropratio = cropratio
+                        , imgscale = imgscale
+                        , lim = lim
+                        , img = img
+                        , crop = crop
+                        , sz = sz
+                    }
 
                 new_photo =
                     { photo | print = new_print }
@@ -541,8 +564,25 @@ update msg model =
 
         TurnPrev ({ print, id } as photo) ->
             let
+                turn =
+                    prevTurn print.turn
+
+                img_size =
+                    imageSize photo.texture
+
+                { cropratio, imgscale, lim, img, crop, sz } =
+                    calc print.cropmode print.size img_size turn (Just print.crop) (floor print.crop.w == floor print.lim.w || floor print.crop.h == floor print.lim.h)
+
                 new_print =
-                    { print | turn = prevTurn print.turn }
+                    { print
+                        | turn = turn
+                        , cropratio = cropratio
+                        , imgscale = imgscale
+                        , lim = lim
+                        , img = img
+                        , crop = crop
+                        , sz = sz
+                    }
 
                 new_photo =
                     { photo | print = new_print }
@@ -559,28 +599,39 @@ update msg model =
         ToggleCropMode ({ print } as photo) ->
             let
                 cropmode =
-                    case print.cropmode of
-                        Fit ->
-                            Fill
-
-                        Fill ->
-                            Fit
-
-                print_size_mm =
-                    if print.horizontal then
-                        P.flip <| Tuple.mapBoth toFloat toFloat print.size
+                    if print.cropmode == Fit then
+                        Fill
 
                     else
-                        Tuple.mapBoth toFloat toFloat print.size
-
-                dim =
-                    Canvas.Texture.dimensions photo.texture
+                        Fit
 
                 img_size =
-                    ( dim.width, dim.height )
+                    imageSize photo.texture
+
+                _ =
+                    log "print.crop" print.crop
+
+                _ =
+                    log "print.lim" print.lim
+
+                max_crop =
+                    let
+                        crop_w_ =
+                            floor print.crop.w
+
+                        crop_h_ =
+                            floor print.crop.h
+
+                        lim_w_ =
+                            floor print.lim.w
+
+                        lim_h_ =
+                            floor print.lim.h
+                    in
+                    crop_w_ == lim_w_ || crop_h_ == lim_h_
 
                 { cropratio, imgscale, lim, img, crop, sz } =
-                    calc cropmode print_size_mm img_size (Just print.crop)
+                    calc cropmode print.size img_size print.turn (Just print.crop) max_crop
 
                 new_print =
                     { print
@@ -618,7 +669,7 @@ update msg model =
                         P.ratio (Tuple.mapBoth toFloat toFloat print.size)
 
                 crop =
-                    R.restrict print.lim (R.turn print.crop)
+                    R.restrict print.lim (R.turn print.crop) False
 
                 bottomRight =
                     R.bottomRight crop
@@ -656,24 +707,14 @@ update msg model =
 
         RecvImage ( file, image, ( originalWidth, originalHeight ) ) ->
             let
-                dim =
-                    Canvas.Texture.dimensions image
-
                 img_size =
-                    ( dim.width, dim.height )
-
-                print_size_mm =
-                    if horizontal then
-                        P.flip (Tuple.mapBoth toFloat toFloat default_printSize_mm)
-
-                    else
-                        Tuple.mapBoth toFloat toFloat default_printSize_mm
+                    imageSize image
 
                 horizontal =
                     originalWidth > originalHeight
 
                 { cropratio, imgscale, lim, img, crop, sz } =
-                    calc default_cropmode print_size_mm img_size Nothing
+                    calc default_cropmode default_printSize_mm img_size TurnUp Nothing True
 
                 print =
                     { id = 0
@@ -822,7 +863,7 @@ canvas ({ texture, print, cur } as photo) =
 
         fog =
             Canvas.shapes
-                [ Canvas.Settings.fill (Color.rgba 1 1 1 0.65) ]
+                [ Canvas.Settings.fill (Color.rgba 1 0.2 0.2 0.5) ]
                 [ fog_top
                 , fog_left
                 , fog_right
@@ -845,16 +886,16 @@ canvas ({ texture, print, cur } as photo) =
         ( rotation, draw_offset ) =
             case print.turn of
                 TurnUp ->
-                    ( degrees 10, ( 0, 0 ) )
+                    ( degrees 0, ( 0, 0 ) )
 
                 TurnRight ->
-                    ( degrees 90, ( print.imgscale * dim.height, 0 ) )
+                    ( degrees 90, ( dim.height, 0 ) )
 
                 TurnDown ->
-                    ( degrees 180, ( print.imgscale * dim.width, print.imgscale * dim.height ) )
+                    ( degrees 180, ( dim.width, dim.height ) )
 
                 TurnLeft ->
-                    ( degrees -90, ( 0, print.imgscale * dim.width ) )
+                    ( degrees -90, ( 0, dim.width ) )
 
         ( trans_x, trans_y ) =
             P.add draw_offset img_P
@@ -862,8 +903,8 @@ canvas ({ texture, print, cur } as photo) =
         img =
             Canvas.texture
                 [ Canvas.Settings.Advanced.transform
-                    [ Canvas.Settings.Advanced.rotate rotation
-                    , Canvas.Settings.Advanced.translate trans_x trans_y
+                    [ Canvas.Settings.Advanced.translate trans_x trans_y
+                    , Canvas.Settings.Advanced.rotate rotation
                     , Canvas.Settings.Advanced.scale print.imgscale print.imgscale
                     ]
                 ]
@@ -872,12 +913,28 @@ canvas ({ texture, print, cur } as photo) =
 
         lim_border =
             Canvas.shapes
-                [ Canvas.Settings.stroke Color.black ]
+                [ Canvas.Settings.stroke Color.black
+                , Canvas.Settings.Line.lineWidth 0.25
+                ]
                 [ Canvas.rect lim_P lim_w lim_h
                 ]
 
+        clear =
+            -- Canvas.clear ( 0, 0 ) 276 276
+            Canvas.shapes
+                [ Canvas.Settings.fill (Color.rgb 0.75 0.75 0.75)
+                ]
+                [ Canvas.rect ( 0, 0 ) 276 276
+                ]
+
+        page =
+            Canvas.shapes
+                [ Canvas.Settings.fill Color.white ]
+                [ Canvas.rect lim_P lim_w lim_h ]
+
         render =
-            [ Canvas.clear ( 0, 0 ) 276 276
+            [ clear
+            , page
             , img
             , fog
             , lim_border
@@ -982,3 +1039,12 @@ hoverStyle hover =
 
     else
         []
+
+
+imageSize : Texture -> Point
+imageSize tex =
+    let
+        dim =
+            Canvas.Texture.dimensions tex
+    in
+    ( dim.width, dim.height )
