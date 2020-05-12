@@ -4,7 +4,9 @@
 function downScaleCanvas(cv, scale){
 	// if (Math.min(cv.width, cv.height)<=100) return cv
 	// var scale = targetSide/cv.width
-	if (!(scale < 1) || !(scale > 0)) throw ('scale must be a positive number <1 ');
+	if (!(scale < 1) || !(scale > 0)) {
+		throw ('scale must be a positive number <1, got:',scale);
+	}
 	var sqScale = scale * scale; // square scale = area of source pixel within target
 	var sw = cv.width; // source image width
 	var sh = cv.height; // source image height

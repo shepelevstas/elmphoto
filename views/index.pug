@@ -20,7 +20,8 @@ block content
     function oneByOne(files){
       const file = files.pop()
       if (file)
-        fileToSmallImage(file).then(res=>{ // res : [File, Image, [width : Int, height : Int]]
+        fileToSmallImage(file).then(res=>{
+          // res : [File, Image, [width : Int, height : Int]]
           app.ports.recvImage.send(res)
           oneByOne(files)
         })
@@ -31,7 +32,7 @@ block content
       return new Promise((done,fail)=>{
         fileToImage(file).then(image=>{
           const scale = 256 / Math.max(image.width, image.height)
-          if (scale >= 1 || scale <= 0) done([file, image, [image.width, image.height]])
+          if (scale >= 1 || scale <= 0) return done([file, image, [image.width, image.height]])
           canvasToImage(downScaleCanvas(imageToCanvas(image),scale))
             .then(img=>{ done([file, img, [image.width, image.height]]) }).catch(fail)
         })
