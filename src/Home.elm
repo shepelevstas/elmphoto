@@ -3,15 +3,15 @@ port module Home exposing (main)
 -- import List.Extra exposing (find)
 -- import File.Select as Select
 -- import Math as M exposing (lim)
+-- import Debug exposing (log)
 
 import Browser
-import Canvas
-import Canvas.Settings
-import Canvas.Settings.Advanced
+import Canvas as C
+import Canvas.Settings as CS
+import Canvas.Settings.Advanced as CSA
 import Canvas.Settings.Line
-import Canvas.Texture exposing (Texture, fromDomImage)
+import Canvas.Texture exposing (Texture)
 import Color
-import Debug exposing (log)
 import File exposing (File)
 import Html exposing (Attribute, Html, button, div, {- img, -} input, label, span, text)
 import Html.Attributes exposing (accept, class, multiple, {- src, -} style, type_, value)
@@ -608,12 +608,10 @@ update msg model =
                 img_size =
                     imageSize photo.texture
 
-                _ =
-                    log "print.crop" print.crop
-
-                _ =
-                    log "print.lim" print.lim
-
+                -- _ =
+                --     log "print.crop" print.crop
+                -- _ =
+                --     log "print.lim" print.lim
                 max_crop =
                     let
                         crop_w_ =
@@ -843,42 +841,39 @@ canvas ({ texture, print, cur } as photo) =
         lim5 =
             P.add lim_P ( 0, crop_y )
 
-        img2 =
-            P.add crop_P ( crop_w, 0 )
-
         lim6 =
             P.add lim5 ( 0, crop_h )
 
-        fog_top =
-            Canvas.rect lim_P lim_w crop_y
-
-        fog_left =
-            Canvas.rect lim5 crop_x crop_h
-
-        fog_right =
-            Canvas.rect img2 (lim_w - crop_w - crop_x) crop_h
-
-        fog_bottom =
-            Canvas.rect lim6 lim_w (lim_h - crop_y - crop_h)
+        img2 =
+            P.add crop_P ( crop_w, 0 )
 
         fog =
-            Canvas.shapes
-                [ Canvas.Settings.fill (Color.rgba 1 0.2 0.2 0.5) ]
-                [ fog_top
-                , fog_left
-                , fog_right
-                , fog_bottom
+            C.shapes
+                [ CS.fill (Color.rgba 1 0.2 0.2 0.6) ]
+                [ -- top
+                  C.rect lim_P lim_w crop_y
+                , -- left
+                  C.rect lim5 crop_x crop_h
+                , -- right
+                  C.rect img2 (lim_w - crop_x - crop_w) crop_h
+                , -- bottom
+                  C.rect lim6 lim_w (lim_h - crop_y - crop_h)
                 ]
 
         crop_rect =
-            Canvas.shapes
-                [ Canvas.Settings.stroke (Color.rgb255 108 113 196) ]
-                [ Canvas.rect crop_P crop_w crop_h ]
+            C.shapes
+                [ CS.stroke (Color.rgb255 108 113 196) ]
+                [ C.rect crop_P crop_w crop_h ]
+
+        crop_size_handle0 =
+            C.shapes
+                [ CS.fill (Color.rgb255 33 150 243) ]
+                [ C.rect (P.add size_handle_offset (P.add crop_P crop_size)) (first size_handle_size) (first size_handle_size) ]
 
         crop_size_handle =
-            Canvas.shapes
-                [ Canvas.Settings.fill (Color.rgb255 33 150 243) ]
-                [ Canvas.circle (P.add crop_P crop_size) 6 ]
+            C.shapes
+                [ CS.fill Color.white ]
+                [ C.circle (P.add crop_P crop_size) 3 ]
 
         dim =
             Canvas.Texture.dimensions photo.texture
@@ -889,48 +884,44 @@ canvas ({ texture, print, cur } as photo) =
                     ( degrees 0, ( 0, 0 ) )
 
                 TurnRight ->
-                    ( degrees 90, ( dim.height, 0 ) )
+                    ( degrees 90, ( dim.height * print.imgscale, 0 ) )
 
                 TurnDown ->
-                    ( degrees 180, ( dim.width, dim.height ) )
+                    ( degrees 180, ( dim.width * print.imgscale, dim.height * print.imgscale ) )
 
                 TurnLeft ->
-                    ( degrees -90, ( 0, dim.width ) )
+                    ( degrees -90, ( 0, dim.width * print.imgscale ) )
 
         ( trans_x, trans_y ) =
             P.add draw_offset img_P
 
         img =
-            Canvas.texture
-                [ Canvas.Settings.Advanced.transform
-                    [ Canvas.Settings.Advanced.translate trans_x trans_y
-                    , Canvas.Settings.Advanced.rotate rotation
-                    , Canvas.Settings.Advanced.scale print.imgscale print.imgscale
+            C.texture
+                [ CSA.transform
+                    [ CSA.translate trans_x trans_y
+                    , CSA.rotate rotation
+                    , CSA.scale print.imgscale print.imgscale
                     ]
                 ]
                 ( 0, 0 )
                 texture
 
         lim_border =
-            Canvas.shapes
-                [ Canvas.Settings.stroke Color.black
+            C.shapes
+                [ CS.stroke Color.black
                 , Canvas.Settings.Line.lineWidth 0.25
                 ]
-                [ Canvas.rect lim_P lim_w lim_h
-                ]
+                [ C.rect lim_P lim_w lim_h ]
 
         clear =
-            -- Canvas.clear ( 0, 0 ) 276 276
-            Canvas.shapes
-                [ Canvas.Settings.fill (Color.rgb 0.75 0.75 0.75)
-                ]
-                [ Canvas.rect ( 0, 0 ) 276 276
-                ]
+            C.shapes
+                [ CS.fill (Color.rgb 0.75 0.75 0.75) ]
+                [ C.rect ( 0, 0 ) 276 276 ]
 
         page =
-            Canvas.shapes
-                [ Canvas.Settings.fill Color.white ]
-                [ Canvas.rect lim_P lim_w lim_h ]
+            C.shapes
+                [ CS.fill Color.white ]
+                [ C.rect lim_P lim_w lim_h ]
 
         render =
             [ clear
@@ -939,6 +930,7 @@ canvas ({ texture, print, cur } as photo) =
             , fog
             , lim_border
             , crop_rect
+            , crop_size_handle0
             , crop_size_handle
             ]
     in
@@ -947,7 +939,7 @@ canvas ({ texture, print, cur } as photo) =
         , Mouse.onMove (.offsetPos >> MouseMove photo)
         , Mouse.onDown (.offsetPos >> MouseDown photo)
         ]
-        [ Canvas.toHtml ( 276, 276 )
+        [ C.toHtml ( 276, 276 )
             [ class "photo", curStyle cur ]
             render
         ]
